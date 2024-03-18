@@ -1,5 +1,8 @@
+print(__name__)
 from transformers import AutoTokenizer
 from cnc_highlighting.encode import BertForHighlightPrediction
+from fin_rag.utils.utils import retrieve_paragraph_from_docid
+
 
 class CncBertHighlighter:
     def __init__(self, model_name: str = 'DylanJHJ/bert-base-final-v0-ep2', device: str = 'cpu'):
@@ -105,12 +108,14 @@ class CncBertHighlighter:
             
 
 if __name__ == "__main__":
-    text_references = [
-        "The slow brown fish jumps over the lazy cat.",
-        "The quick brown fox runs over the lazy dog.",
-        "The quick brown fox jumps over the diligent dog."
+
+    reference_docids = [
+        "20221028_10-K_320193_part2_item7_para7",
+        "20221028_10-K_320193_part2_item7_para8",
+        "20220318_10-K_1045810_part2_item7_para5"
     ]
-    target = "The quick brown fox jumps over the lazy dog."
+    text_references = [retrieve_paragraph_from_docid(docid) for docid in reference_docids]
+    target = retrieve_paragraph_from_docid("20221028_10-K_320193_part2_item7_para7")
     highlighter = CncBertHighlighter()
     highlight_results = highlighter.highlighting_outputs(target, text_references, mean_aggregate=True, label_threshold=0.3, generate_spans=True)
     # highlighter.visualize_top_k_highlight(highlight_results, highlight_words_cnt=5)

@@ -126,7 +126,7 @@ def aggregate_highlights(annotation_files, output_file, agreement_threshold=0):
                 sample["highlight_spans"].append((start, end))
             else:
                 i += 1
-        sample["highlight_spans"] = [sample["tokens"][start: end-1] for start, end in sample["highlight_spans"]]
+        sample["highlight_spans"] = [" ".join(sample["tokens"][start: end-1]) for start, end in sample["highlight_spans"]]
         sample["type"] = max(sample["type"], key=sample["type"].count)
         sample["topic"] = max(sample["topic"], key=sample["topic"].count)
         sample["subtopic"] = max(sample["subtopic"], key=sample["subtopic"].count)
