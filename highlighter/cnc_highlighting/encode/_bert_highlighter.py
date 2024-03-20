@@ -118,6 +118,8 @@ class BertForHighlightPrediction(BertPreTrainedModel):
             text_tgt = [t.split() for t in text_tgt]
             text_ref = [t.split() for t in text_ref]
 
+
+        
         input_tokenized = self.tokenizer(
                 text_ref, text_tgt,
                 max_length=512,
@@ -126,6 +128,7 @@ class BertForHighlightPrediction(BertPreTrainedModel):
                 is_split_into_words=True,
                 return_tensors='pt'
         ).to(device)
+        # print(self.tokenizer.decode(input_tokenized['input_ids'][0]))
 
         # encode
         with torch.no_grad():

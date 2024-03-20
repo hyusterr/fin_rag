@@ -1,7 +1,6 @@
-print(__name__)
 from transformers import AutoTokenizer
-from cnc_highlighting.encode import BertForHighlightPrediction
-from fin_rag.utils.utils import retrieve_paragraph_from_docid
+from .cnc_highlighting.encode import BertForHighlightPrediction
+# from ..utils.utils import retrieve_paragraph_from_docid
 
 
 class CncBertHighlighter:
@@ -14,16 +13,36 @@ class CncBertHighlighter:
             self, 
             target, 
             text_references, 
+            max_length: int = 512,
             mean_aggregate: bool = False,
             label_threshold: float = 0.5,
             generate_spans: bool = False,
         ):
-        num_references = len(text_references)
-        targets = [target] * num_references
+
+        # TODO: this can be improved; the window can be obtained by a rationale model? (RQ)
+        # at least 3 special tokens: [CLS], [SEP], [SEP]
+        tokenized_target = self.model.tokenizer.tokenize(target)
+        target_length = len(tokenized_target)
+        if target_length > max_length - 3:
+            raise ValueError(f"Target length {target_length} is longer than max_length {max_length - 3}")
+
+        text_windows = []
+        for text_raw in text_references:
+            text = text_raw.split()
+            if len(text) > max_length - target_length - 3:
+                while len(text) > max_length - target_length - 3:
+                    window = text[:max_length - target_length - 3]
+                    text_windows.append(" ".join(window)) # not efficient here
+                    text = text[len(window):]
+            else:
+                text_windows.append(text_raw)
+ 
+        num_windows = len(text_windows)
+        targets = [target] * num_windows
 
         outputs = self.model.encode(
             text_tgt=targets,
-            text_ref=text_references,
+            text_ref=text_windows,
             pretokenized=False, 
             return_reference=False
         )
@@ -36,19 +55,19 @@ class CncBertHighlighter:
         if mean_aggregate:
             words_tgt = outputs[0]['words_tgt']
             word_probs_tgt = self.mean_aggregate_highlights(outputs)
-            outputs = {'words_tgt': words_tgt, 'word_probs_tgt_mean': word_probs_tgt}
+            outputs = {'words_tgt': words_tgt, 'words_probs_tgt_mean': word_probs_tgt}
 
         if label_threshold:
-            assert 'word_probs_tgt_mean' in outputs
-            outputs['word_label_tgt_mean'] = (outputs['word_probs_tgt_mean'] > label_threshold).astype(int)
+            assert 'words_probs_tgt_mean' in outputs
+            outputs['words_label_tgt_mean'] = (outputs['words_probs_tgt_mean'] > label_threshold).astype(int)
 
         if generate_spans:
-            assert 'word_label_tgt_mean' in outputs
-            outputs['word_label_tgt_smooth'] = self.generate_highlight_spans(outputs['word_label_tgt_mean'])
+            assert 'words_label_tgt_mean' in outputs
+            outputs['words_label_tgt_smooth'] = self.generate_highlight_spans(outputs['words_label_tgt_mean'])
             # get the spans of the words
             i, spans = 0, []
             tmp = []
-            for label in outputs['word_label_tgt_smooth']:
+            for label in outputs['words_label_tgt_smooth']:
                 if label:
                     tmp.append(i)
                 else:
@@ -104,19 +123,4 @@ class CncBertHighlighter:
             else:
                 smooth_tokenids.append(label)
             
-        return smooth_tokenids
-            
-
-if __name__ == "__main__":
-
-    reference_docids = [
-        "20221028_10-K_320193_part2_item7_para7",
-        "20221028_10-K_320193_part2_item7_para8",
-        "20220318_10-K_1045810_part2_item7_para5"
-    ]
-    text_references = [retrieve_paragraph_from_docid(docid) for docid in reference_docids]
-    target = retrieve_paragraph_from_docid("20221028_10-K_320193_part2_item7_para7")
-    highlighter = CncBertHighlighter()
-    highlight_results = highlighter.highlighting_outputs(target, text_references, mean_aggregate=True, label_threshold=0.3, generate_spans=True)
-    # highlighter.visualize_top_k_highlight(highlight_results, highlight_words_cnt=5)
-    print(highlight_results)
+        return smooth_tokenids            
