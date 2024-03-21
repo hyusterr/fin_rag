@@ -1,3 +1,4 @@
+import torch
 from transformers import AutoTokenizer
 from .cnc_highlighting.encode import BertForHighlightPrediction
 # from ..utils.utils import retrieve_paragraph_from_docid
@@ -5,7 +6,7 @@ from .cnc_highlighting.encode import BertForHighlightPrediction
 
 class CncBertHighlighter:
     def __init__(self, model_name: str = 'DylanJHJ/bert-base-final-v0-ep2', device: str = 'cpu'):
-        self.device = device
+        self.device = torch.device(device)
         self.model = BertForHighlightPrediction.from_pretrained(model_name)
         self.model.to(self.device)
     
@@ -40,7 +41,9 @@ class CncBertHighlighter:
         num_windows = len(text_windows)
         targets = [target] * num_windows
 
+
         outputs = self.model.encode(
+            device=self.device,
             text_tgt=targets,
             text_ref=text_windows,
             pretokenized=False, 

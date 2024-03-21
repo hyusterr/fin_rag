@@ -6,8 +6,8 @@
 
 import evaluate
 from pathlib import Path
-from ..utils.utils import read_jsonl, retrieve_paragraph_from_docid
-from ..utils.config import FORMATTED_DIR
+from utils.utils import read_jsonl, retrieve_paragraph_from_docid
+from utils.config import FORMMATED_DIR
 
 class CncAlignment:
     def __init__(self, topK=10, rouge_type='rouge2', tag="cnc_alignment"):
@@ -23,13 +23,13 @@ class CncAlignment:
         date, form, cik, part, item, para = target_id.split("_")
         year = int(date[:4])
         search_pattern_file = f"{year-1}*_{form}_{cik}.jsonl"
-        search_pattern = Path(FORMATTED_DIR).rglob(search_pattern_file)
+        search_pattern = Path(FORMMATED_DIR).rglob(search_pattern_file)
         for file in search_pattern:
             references = read_jsonl(file)
             break
-
+        
         reference_ids = [reference["id"] for reference in references]
-        reference_texts = [reference["text"] for reference in references]
+        reference_texts = [reference["contents"] for reference in references]
         target_texts = [target_text] * len(reference_texts)
 
         # TODO: check if predictions and referecnces of rouge input matters?
@@ -38,7 +38,7 @@ class CncAlignment:
             predictions=target_texts, 
             references=reference_texts,
             rouge_types=[self.rouge_type],
-            use_agregator=False
+            use_aggregator=False
         )[self.rouge_type]
 
         # rank the paragraphs based on the similarity score

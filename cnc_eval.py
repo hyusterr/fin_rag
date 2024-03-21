@@ -48,6 +48,7 @@ def cnc_evaluate(retrieve_result_file, truth_file, label_threshold=0.5, device='
         highlight_result['id'] = target_id
         predictions[target_id] = highlight_result
         predictions[target_id]['references'] = paragraph_list
+        predictions[target_id]['ref_ids'] = row['doc_id_list']
 
        
     metrics = defaultdict(list)
@@ -55,6 +56,7 @@ def cnc_evaluate(retrieve_result_file, truth_file, label_threshold=0.5, device='
         target_id = truth['id']
         highlight_result = predictions[target_id]
         paragraph_list = highlight_result['references']
+        ref_ids = highlight_result['ref_ids']
         # TODO: threshold setting duplicated, need to one of them
         # TODO: need to unify naming of keys
         metric_tmp = evaluate_a_pair_highlight(highlight_result, truth) #, threshold=0.5)
@@ -63,8 +65,12 @@ def cnc_evaluate(retrieve_result_file, truth_file, label_threshold=0.5, device='
                 metrics[k].append(v)
 
         if verbose:
-            print(f"[target] id: {target_id}")
-            print(f"[target] text: {target_text}")
+            print(f"[target]")
+            print(f"{target_id}:\t{target_text}")
+            print("-"*50)
+            print(f"[references]: {len(paragraph_list)}")
+            for id_, p in zip(ref_ids, paragraph_list):
+                print(f"{id_}:\t{p}")
             print("-"*50)
             print(f"[highlight spans] truth:")
             for span in truth["highlight_spans"]:
@@ -75,10 +81,6 @@ def cnc_evaluate(retrieve_result_file, truth_file, label_threshold=0.5, device='
             print("-"*50)
             print("[highlight prob. (mean)] truth:", np.array(truth['highlight_probs']).round(3))
             print("[highlight prob. (mean)] prediction:", highlight_result['words_probs_tgt_mean'].round(3))
-            print("-"*50)
-            print(f"[references]: {len(paragraph_list)}")
-            for p in paragraph_list:
-                print(p)
             print("-"*50)
             print(f"metrics of this sample:")
             pprint(metric_tmp)
