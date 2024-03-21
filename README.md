@@ -20,4 +20,6 @@ python3 cnc_eval.py \
     -tf annotation/annotated_result/5_sample/aggregate_qlabels.jsonl \
     -v | tee result/5sample/R.cnc_H.cnc.result
 ```
-In order to keep naming consistency and make it easier to manage results, we recommend naming the retrieval result file (rf) as `result/{annotation_set_name}/{retrieval_method}_retrieval.trec` and the evaluation result file as `R.{retrieval_method}_H.{retrieval_method}.result`. The result file contains the evaluation result of the retrieval method and the highlighter. For example, `cnc_retrieval.trec` contains the retrieval result of CnC retrieval method and `R.cnc_H.cnc.result` contains the evaluation result of the retrieval method and the highlighter.
+In order to keep naming consistency and make it easier to manage results, we recommend naming the retrieval result file (rf) as `result/{annotation_set_name}/{retrieval_method}_retrieval.trec` and the evaluation result file as `R.{retrieval_method}_H.{retrieval_method}.result`. 
+The result file contains the evaluation result of the retrieval method and the highlighter. 
+For example, `cnc_retrieval.trec` contains the retrieval result of-CnC retrieval method and `R.cnc_H.cnc.result` contains the evaluation result of the CnC-retrieval method along with the CnC-highlighter.
