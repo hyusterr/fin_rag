@@ -5,17 +5,19 @@
 20211029_10-K_320193_part2_item7_para6:	in april 2021, the company announced an increase to its current share repurchase program authorization from $225 billion to $315 billion and raised its quarterly dividend from $0.205 to $0.22 per share beginning in may 2021. during 2021, the company repurchased $85.5 billion of its common stock and paid dividends and dividend equivalents of $14.5 billion.
 --------------------------------------------------
 [highlight spans] truth:
-announced an increase to its program authorization from $315 billion to $405 billion and raised its quarterly dividend from $0.22 to $0.23 per share beginning in may
-repurchased $90.2 billion of its common stock and paid dividends and dividend equivalents of $14.8
+april 2022, the company announced an increase to its program authorization from $315 billion to $405 billion and raised its quarterly dividend from $0.22 to $0.23 per share beginning in may
+the company repurchased $90.2 billion of its common stock and paid dividends and dividend equivalents of $14.8
 [highlight spans] prediction:
 $405
 $0.23
 $90.2
 $14.8
 --------------------------------------------------
-[highlight prob. (mean)] truth: [0.  0.  0.  0.  0.  0.5 0.5 1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.
- 0.5 1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  0.5 0.5 0.5 0.5 0.  0.  0.
- 0.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1. ]
+[highlight prob. (mean)] truth: [0.    0.333 0.333 0.333 0.333 0.667 0.667 1.    1.    1.    1.    1.
+ 1.    1.    1.    1.    1.    1.    0.667 1.    1.    1.    1.    1.
+ 1.    1.    1.    1.    1.    0.333 0.333 0.333 0.333 0.    0.    0.333
+ 0.333 1.    1.    1.    1.    1.    1.    1.    1.    1.    1.    1.
+ 1.    1.    1.    1.    1.   ]
 [highlight prob. (mean)] prediction: [0.002 0.006 0.365 0.001 0.005 0.001 0.001 0.001 0.001 0.001 0.003 0.002
  0.001 0.067 0.004 0.002 0.837 0.204 0.    0.002 0.001 0.005 0.004 0.001
  0.166 0.003 0.751 0.027 0.012 0.003 0.001 0.008 0.055 0.003 0.108 0.001
@@ -23,16 +25,16 @@ $14.8
  0.002 0.002 0.001 0.716 0.022]
 --------------------------------------------------
 metrics of this sample:
-{'correlation': 0.11556288216034814,
- 'f1': 0.16666666666666669,
+{'correlation': 0.12660083736611044,
+ 'f1': 0.14814814814814814,
  'id': '20221028_10-K_320193_part2_item7_para7',
  'precision': 1.0,
- 'r_precision': 0.8181818181818182,
- 'recall': 0.09090909090909091,
- 'rouge1': 0.2641509433962264,
- 'rouge2': 0.11764705882352941,
- 'rougeL': 0.2641509433962264,
- 'rougeLsum': 0.2641509433962264}
+ 'r_precision': 0.94,
+ 'recall': 0.08,
+ 'rouge1': 0.23728813559322035,
+ 'rouge2': 0.10526315789473684,
+ 'rougeL': 0.23728813559322035,
+ 'rougeLsum': 0.23728813559322035}
 +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
 
 [target]
@@ -55,11 +57,13 @@ terminate
 record
 write-off
 --------------------------------------------------
-[highlight prob. (mean)] truth: [0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.5
- 0.5 0.5 1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.
- 0.  0.  0.  0.  0.  0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.  0.5
- 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.  0.  0.  0.  0.
- 0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0. ]
+[highlight prob. (mean)] truth: [0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.
+ 0.    0.    0.    0.    0.    0.667 0.667 0.667 1.    1.    1.    1.
+ 1.    1.    1.    1.    1.    1.    1.    1.    1.    1.    1.    1.
+ 0.    0.    0.    0.    0.    0.333 0.333 0.333 0.333 0.333 0.333 0.333
+ 0.333 0.333 0.333 0.333 0.    0.333 0.333 0.333 0.333 0.333 0.333 0.333
+ 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.    0.    0.    0.    0.
+ 0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.   ]
 [highlight prob. (mean)] prediction: [0.205 0.262 0.17  0.255 0.003 0.255 0.511 0.014 0.016 0.196 0.298 0.193
  0.157 0.007 0.395 0.354 0.099 0.274 0.019 0.257 0.253 0.018 0.483 0.018
  0.019 0.264 0.222 0.18  0.064 0.202 0.112 0.032 0.265 0.113 0.017 0.149
@@ -69,7 +73,7 @@ write-off
  0.015 0.584 0.013 0.013 0.239 0.266 0.02  0.31  0.017 0.318 0.084]
 --------------------------------------------------
 metrics of this sample:
-{'correlation': -0.05349448445171764,
+{'correlation': -0.0624038882698617,
  'f1': 0.04166666666666667,
  'id': '20220318_10-K_1045810_part2_item7_para5',
  'precision': 0.25,
@@ -88,7 +92,8 @@ metrics of this sample:
 20210222_10-K_200406_part2_item7_para39:	in-process research and development (ipr&d): in fiscal year 2020, the company recorded an ipr&d charge of $0.2 billion primarily related to a partial impairment due to timing and progression of one of the digital surgery platforms acquired with the auris health acquisition. in the fiscal year 2019, the company recorded an ipr&d charge of $0.9 billion for the remaining intangible asset value related to the development program of al-8176, an investigational drug for the treatment of respiratory syncytial virus (rsv) and human metapneumovirus (hmpv) acquired with the 2014 acquisition of alios biopharma inc. the impairment charge was based on additional information, including clinical data, which became available and led to the company's decision to abandon the development of al-8176.
 --------------------------------------------------
 [highlight spans] truth:
-terminate the development of bermekimab for atopic dermatitis (ad). the company recorded an intangible asset impairment charge of approximately $0.6 billion related to an in-process research and development asset,
+information regarding efficacy became available which led the company to the decision to terminate the development of bermekimab for atopic dermatitis (ad). the company recorded an intangible asset impairment charge of approximately $0.6 billion related to an in-process research and development asset,
+the impairment charge is related to the ad indication and is a nonrecognized subsequent event and will be reflected in the first quarter 2022 financial
 [highlight spans] prediction:
 28,
 efficacy
@@ -99,12 +104,15 @@ hidradenitis suppurativa (hs).
 nonrecognized
 rights to bermekimab from xbiotech,
 --------------------------------------------------
-[highlight prob. (mean)] truth: [0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.
- 0.  0.  0.  0.  0.  0.  1.  1.  1.  1.  1.  1.  1.  1.  1.  0.5 0.5 1.
- 1.  1.  1.  1.  1.  1.  1.  1.  1.  0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5
- 0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.
- 0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.
- 0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0. ]
+[highlight prob. (mean)] truth: [0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.333
+ 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333
+ 1.    1.    1.    1.    1.    1.    1.    1.    1.    0.333 0.333 0.667
+ 0.667 0.667 0.667 0.667 0.667 0.667 0.667 0.667 0.667 0.333 0.333 0.333
+ 0.333 0.333 0.333 0.333 0.333 0.333 0.    0.    0.    0.    0.    0.
+ 0.    0.    0.    0.    0.    0.    0.    0.333 0.333 0.333 0.333 0.333
+ 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333
+ 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.    0.    0.
+ 0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.   ]
 [highlight prob. (mean)] prediction: [0.008 0.471 0.509 0.199 0.388 0.003 0.002 0.009 0.019 0.046 0.009 0.034
  0.265 0.564 0.006 0.008 0.001 0.022 0.002 0.02  0.002 0.005 0.038 0.021
  0.663 0.029 0.129 0.009 0.251 0.02  0.635 0.676 0.47  0.002 0.009 0.004
@@ -116,16 +124,16 @@ rights to bermekimab from xbiotech,
  0.342 0.599 0.06  0.226 0.044 0.701 0.076 0.001 0.003 0.007 0.005]
 --------------------------------------------------
 metrics of this sample:
-{'correlation': 0.04249504621088023,
- 'f1': 0.17777777777777776,
+{'correlation': 0.06828482815627622,
+ 'f1': 0.14285714285714285,
  'id': '20220217_10-K_200406_part2_item7_para42',
- 'precision': 0.26666666666666666,
- 'r_precision': 0.26666666666666666,
- 'recall': 0.13333333333333333,
- 'rouge1': 0.2978723404255319,
- 'rouge2': 0.08888888888888888,
- 'rougeL': 0.25531914893617014,
- 'rougeLsum': 0.25531914893617014}
+ 'precision': 0.4,
+ 'r_precision': 0.6086956521739131,
+ 'recall': 0.08695652173913043,
+ 'rouge1': 0.2117647058823529,
+ 'rouge2': 0.048192771084337345,
+ 'rougeL': 0.16470588235294117,
+ 'rougeLsum': 0.16470588235294117}
 +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
 
 [target]
@@ -148,15 +156,20 @@ available borrowing capacity
 recovery
 repaid
 --------------------------------------------------
-[highlight prob. (mean)] truth: [0.  0.  0.  0.  0.  0.  0.  0.  0.  0.5 0.5 0.  0.  0.  0.  0.  0.  0.
- 0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  1.
- 1.  1.  1.  0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5
- 1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  0.5 1.  1.  1.  1.
- 1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  1.  0.  0.  0.  0.  0.
- 0.  0.  0.  0.5 1.  1.  1.  1.  1.  1.  1.  0.5 0.5 0.5 0.5 0.5 0.5 0.5
- 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.  0.  0.  0.
- 0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.
- 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.  0.  0.  0.  0.  0.  0.  0. ]
+[highlight prob. (mean)] truth: [0.    0.    0.    0.    0.    0.    0.    0.    0.    0.333 0.333 0.
+ 0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.
+ 0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.667
+ 0.667 0.667 0.667 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333
+ 0.333 0.333 0.333 0.667 0.667 0.667 1.    1.    1.    1.    1.    1.
+ 1.    1.    1.    1.    1.    1.    1.    0.667 1.    1.    1.    1.
+ 1.    1.    1.    1.    1.    1.    1.    1.    1.    1.    1.    1.
+ 1.    0.    0.    0.    0.    0.    0.    0.    0.    0.333 1.    1.
+ 1.    1.    1.    1.    1.    0.667 0.667 0.667 0.667 0.667 0.667 0.667
+ 0.667 0.667 0.667 0.667 0.667 0.667 0.667 0.667 0.667 0.667 0.667 0.667
+ 0.333 0.333 0.    0.    0.    0.    0.    0.    0.    0.    0.    0.
+ 0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.
+ 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.    0.    0.    0.    0.
+ 0.    0.    0.   ]
 [highlight prob. (mean)] prediction: [0.003 0.376 0.005 0.004 0.551 0.522 0.364 0.003 0.002 0.003 0.003 0.001
  0.004 0.003 0.004 0.01  0.002 0.006 0.002 0.25  0.022 0.557 0.33  0.003
  0.519 0.151 0.005 0.009 0.433 0.012 0.005 0.399 0.002 0.026 0.008 0.005
@@ -173,7 +186,7 @@ repaid
  0.007 0.454 0.127]
 --------------------------------------------------
 metrics of this sample:
-{'correlation': -0.030275895685280226,
+{'correlation': -0.025541403420230504,
  'f1': 0.11881188118811878,
  'id': '20220216_10-K_1585689_part2_item7_para74',
  'precision': 0.46153846153846156,
@@ -200,10 +213,12 @@ acquisition
 same-day delivery
 9
 --------------------------------------------------
-[highlight prob. (mean)] truth: [0.  0.  0.  0.5 1.  1.  1.  1.  1.  0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 1.
- 1.  1.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.  0.5 1.  1.  1.  1.  1.
- 1.  1.  1.  1.  1.  1.  1.  0.5 0.5 0.5 0.  0.  0.  0.  0.  0.  0.  0.
- 0.  0.  0.  0.  0.  0.  0. ]
+[highlight prob. (mean)] truth: [0.    0.    0.    0.667 1.    1.    1.    1.    1.    0.667 0.667 0.667
+ 0.667 0.667 0.667 0.667 0.667 1.    1.    1.    0.    0.    0.    0.
+ 0.    0.    0.    0.    0.    0.    0.667 1.    1.    1.    1.    1.
+ 1.    1.    1.    1.    1.    1.    1.    0.667 0.667 0.667 0.    0.
+ 0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.
+ 0.   ]
 [highlight prob. (mean)] prediction: [0.014 0.332 0.479 0.036 0.445 0.033 0.566 0.036 0.417 0.005 0.432 0.331
  0.174 0.009 0.661 0.52  0.331 0.004 0.347 0.242 0.003 0.211 0.003 0.168
  0.008 0.434 0.191 0.489 0.474 0.424 0.005 0.303 0.141 0.21  0.14  0.028
@@ -212,7 +227,7 @@ same-day delivery
  0.468]
 --------------------------------------------------
 metrics of this sample:
-{'correlation': -0.03161355067512578,
+{'correlation': -0.024293865600946565,
  'f1': 0.16216216216216214,
  'id': '20220222_10-K_1090727_part2_item7_para5',
  'precision': 0.75,
@@ -226,12 +241,12 @@ metrics of this sample:
 
 metrics of all samples:
 defaultdict(<class 'list'>,
-            {'correlation': 0.008534799511820946,
-             'f1': 0.1334170308922784,
-             'precision': 0.5456410256410257,
-             'r_precision': 0.5328787878787878,
-             'recall': 0.08121212121212122,
-             'rouge1': 0.2069548908890539,
-             'rouge2': 0.0796983129821508,
-             'rougeL': 0.19844425259118154,
-             'rougeLsum': 0.19844425259118154})
+            {'correlation': 0.01652930164626958,
+             'f1': 0.12272920020444773,
+             'precision': 0.5723076923076923,
+             'r_precision': 0.6256482213438735,
+             'recall': 0.06975494071146245,
+             'rouge1': 0.18436080241981684,
+             'rouge2': 0.06908230923548196,
+             'rougeL': 0.17494903771393452,
+             'rougeLsum': 0.17494903771393452})
