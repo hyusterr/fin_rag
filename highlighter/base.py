@@ -11,7 +11,7 @@ from typing import List
 FPB_label2id = {0: "negative", 1: "neutral", 2: "positive"}
 FPB_id2label = {v: k for k, v in FPB_label2id.items()}
 
-class BaseHiglighter:
+class BaseHighlighter:
     def __init__(self, model_name='bert-base-uncased', device='cuda'):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForMaskedLM.from_pretrained(model_name)

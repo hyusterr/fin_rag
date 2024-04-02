@@ -5,12 +5,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import transformers
-from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
-from highlighter import BaseHighlighter
+from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline, AutoModelForSeq2SeqLM
+from highlighter.base import BaseHighlighter
+from typing import List
 
 # because FPB's label is defined by "the impact of the news on the stock price", we can use the sentiment analysis model to predict the label
 MOST_DOWNLOAD_FPB_MODELS_HF = {
-    "Sigma/financial-sentiment-analysis": dict(Loss=0.0395, Accuracy=0.9924 F1=0.9924),
+    "Sigma/financial-sentiment-analysis": dict(Loss=0.0395, Accuracy=0.9924, F1=0.9924),
     "mrm8488/distilroberta-finetuned-financial-news-sentiment-analysis": dict(Loss=0.1116, Accuracy=0.9823, F1=None),
     "mr8488/distilroberta-finetuned-financial-news-sentiment-analysis-v2": dict(Loss=0.1116, Accuracy=0.9923, F1=None),
     "ahmedrachid/FinancialBERT-Sentiment-Analysis": dict(Loss=None, Accuracy=0.98, F1=0.98)
@@ -31,10 +32,17 @@ MOST_DOWNLOAD_SUM_MODELS_HF = {
 # 4. https://dl.acm.org/doi/pdf/10.1145/3442442.3451373 # MDA as 10K's summary
 
 class AttnHighlighter(BaseHighlighter):
-    def __init__(self, model_name, method, device='cuda', load_pipe=False):
+    def __init__(
+            self, 
+            model_name='human-centered-summarization/financial-summarization-pegasus', 
+            method='summarization', 
+            device='cuda:0', 
+            load_pipe=False
+        ):
+        # TODO: hf now supports device_map='auto', which will automatically select the device, see: https://huggingface.co/docs/accelerate/v0.22.0/en/concept_guides/big_model_inference
         self.device = device
-        # TODO: how to automtically get max_length from the model?
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.max_length = self.tokenizer.model_max_length
         if method == 'text-classification':
             self.model = AutoModelForSequenceClassification.from_pretrained(model_name).to(device)
         elif method == 'summarization':
@@ -48,26 +56,89 @@ class AttnHighlighter(BaseHighlighter):
             elif method == 'summarization':
                 self.pipe = pipeline("summarization", model=model_name, device=device)
 
-    def predict(self, text: List[str]):
-        if self.pipe is not None:
-            return self.pipe(text)
-        # TODO: window sliding if a text is too long
-        inputs = self.tokenizer(text, return_tensors='pt', padding=True, truncation=True, max_length=512).to(self.device)
+    # TODO: window sliding if a text is too long
+    def predict(self, text: List[str], output_attentions=False):
+        '''
+        text example: ["The stock price of Apple Inc. has increased by 10% after the announcement of the new iPhone 13.", "The stock price of Apple Inc. has increased by 10% after the announcement of the new iPhone 13."]
+        '''
+        if self.pipe is not None and not output_attentions:
+            return self.pipe(text, output_attentions=output_attentions)
+        
+        inputs = self.tokenizer(text, return_tensors='pt', padding=True, truncation=True).to(self.device) # use intrinsic padding and truncation wrt. max_length
+        print(inputs)
         with torch.no_grad():
-            outputs = self.model(**inputs)
-        return outputs.logits
+            if self.method == 'text-classification':
+                outputs = self.model(**inputs, output_attentions=output_attentions, return_dict=True)
 
-    def highlight_outputs(
+            # TODO: what is the difference between generate and forward?
+            # TODO: check the usage of decoder_input_ids
+            # "Pegasus uses the pad_token_id as the starting token for decoder_input_ids generation. If past_key_values is used, optionally only the last decoder_input_ids have to be input (see past_key_values)."
+            # decide to use generate() instead of forward() because we can skip the decoder_input_ids process
+            elif self.method == 'summarization':
+                outputs = self.model.generate(
+                        **inputs, 
+                        return_dict_in_generate=True, 
+                        output_scores=True,
+                        # decoder_input_ids=self.tokenizer.pad_token_id, 
+                        output_attentions=output_attentions, 
+                        num_beams=1, # default num_beams=8 in Pegasus # no beam search for simplicity
+                        length_penalty=None, # default length_penalty=0.6 in Pegasus, if num_beams=1, length_penalty should be unset
+                        # return_dict=True
+                        )
+                # default return a GenerateBeamEncoderDecoderOutput object, see https://huggingface.co/docs/transformers/internal/generation_utils#transformers.generation.GenerateBeamEncoderDecoderOutput
+                # TODO: decide whether to use beam_search or not
+        return outputs
+
+    def highlighting_outputs(
             self,
             target: str,
-            text_reference: List[str],
+            text_reference: List[str], # attn_highlighter do not need text_reference, just for compatibility
             max_length: int = 512,
             mean_aggregate: bool = True,
-            threshold: float = 0.5,
+            label_threshold: float = 0.5,
             generate_spans: bool = True,
+            verbose: bool = True
         ):
         # get the prediction of the target
+        outputs = self.predict(target, output_attentions=True)
+        print(type(outputs))
+    
 
         # get the attention scores of each token in the target w.r.t. the prediction
+        if self.method == 'text-classification':
+            attentions = outputs.attentions
+        elif self.method == 'summarization':
+            # TODO: decide to use encoder_attentions or cross_attentions or decoder_attentions
+            attentions = outputs.cross_attentions 
 
-        # get the top-
+        # attentions shape: (num_generated_tokens, num_layers, num_beams, num_heads, 1(one generated token), num_target_tokens), with the first and second dimensions are store in tuples
+        # get the average attention scores of each token in the target w.r.t. the prediction
+        attention_target = np.zeros()
+        for i, generated_token in enumerate(attentions):
+            for j, layer in enumerate(generated_token):
+                for k, head in enumerate(layer):
+                    pass
+
+        # get the top-K tokens with the highest attention scores, return label=1
+
+        if verbose:
+            print("model: ", self.model)
+            print("target: ", target)
+            print("target length: ", len(self.tokenizer(target)['input_ids']))
+            print("target decoded: ", self.tokenizer.decode(self.tokenizer(target)['input_ids']))
+            print("output type:", type(outputs))
+            print(outputs.keys())
+            print("outputs.sequences: ", outputs.sequences)
+            print("summary:", self.tokenizer.decode(outputs.sequences[0]))
+            print("summary length: ", len(outputs.sequences[0]))
+            print("len(attentions): ", len(attentions))
+            print("len(attentions[0]): ", len(attentions[0]))
+            print("len(attentions[0][0]): ", attentions[0][0].shape)
+            print("attentions_target: ", attentions_target)
+
+
+
+
+        # get smoothed label for each token
+
+        # get the smoothed span
