@@ -36,7 +36,7 @@ class AttnHighlighter(BaseHighlighter):
             self, 
             model_name='human-centered-summarization/financial-summarization-pegasus', 
             method='summarization', 
-            device='cuda:0', 
+            device='cuda:2', 
             load_pipe=False
         ):
         # TODO: hf now supports device_map='auto', which will automatically select the device, see: https://huggingface.co/docs/accelerate/v0.22.0/en/concept_guides/big_model_inference
@@ -62,10 +62,10 @@ class AttnHighlighter(BaseHighlighter):
         text example: ["The stock price of Apple Inc. has increased by 10% after the announcement of the new iPhone 13.", "The stock price of Apple Inc. has increased by 10% after the announcement of the new iPhone 13."]
         '''
         if self.pipe is not None and not output_attentions:
-            return self.pipe(text, output_attentions=output_attentions)
+            out = self.pipe(text, output_attentions=output_attentions)
+            return None, out
         
         inputs = self.tokenizer(text, return_tensors='pt', padding=True, truncation=True).to(self.device) # use intrinsic padding and truncation wrt. max_length
-        print(inputs)
         with torch.no_grad():
             if self.method == 'text-classification':
                 outputs = self.model(**inputs, output_attentions=output_attentions, return_dict=True)
@@ -87,7 +87,7 @@ class AttnHighlighter(BaseHighlighter):
                         )
                 # default return a GenerateBeamEncoderDecoderOutput object, see https://huggingface.co/docs/transformers/internal/generation_utils#transformers.generation.GenerateBeamEncoderDecoderOutput
                 # TODO: decide whether to use beam_search or not
-        return outputs
+        return inputs, outputs
 
     def highlighting_outputs(
             self,
@@ -99,9 +99,12 @@ class AttnHighlighter(BaseHighlighter):
             generate_spans: bool = True,
             verbose: bool = True
         ):
+        
+        return_dict = {}
+
         # get the prediction of the target
-        outputs = self.predict(target, output_attentions=True)
-        print(type(outputs))
+        tokenized_inputs, outputs = self.predict(target, output_attentions=True)
+        # print(type(outputs)) # GenerateBeamEncoderDecoderOutput or GenerateEncoderDecoderOutput
     
 
         # get the attention scores of each token in the target w.r.t. the prediction
@@ -112,29 +115,49 @@ class AttnHighlighter(BaseHighlighter):
             attentions = outputs.cross_attentions 
 
         # attentions shape: (num_generated_tokens, num_layers, num_beams, num_heads, 1(one generated token), num_target_tokens), with the first and second dimensions are store in tuples
+        # pegasus has 16 layers and 16 heads for encoder and decoder respectively
         # get the average attention scores of each token in the target w.r.t. the prediction
-        attention_target = np.zeros()
-        for i, generated_token in enumerate(attentions):
-            for j, layer in enumerate(generated_token):
-                for k, head in enumerate(layer):
-                    pass
+        attention_target = torch.stack([torch.stack(a) for a in attentions]) # shape: (num_generated_tokens, num_layers, num_beams, num_heads, 1, num_target_tokens) # first 2 dimensions are stored in tuples, so .stack() twice
+        # get the average attention scores of each target token, shape (num_target_tokens, 1)
+        attention_target = attention_target.mean(dim=(0, 1, 2, 3, 4)).squeeze() # shape: (num_target_tokens, 1)
+        # dim: the dimension to reduce; .squeeze() remove the dimension with size 1
+        # here, sum(attention_target) = 1, because the attention scores are normalized, this shall be transformed to a sequece of probabilities, i.e. each element's max value is 1 after combine subwords
+
+        decoded = self.tokenizer.convert_ids_to_tokens(self.tokenizer(target)['input_ids'])
+        assert len(decoded) == len(attention_target)
+
+        # if 2+ subwords are combined, the attention scores should be combined as well
+        for i, token in enumerate(decoded):
+            if self.tokenizer.is_token_part(token):
+                print(token)
+                break
+
+
+                  
 
         # get the top-K tokens with the highest attention scores, return label=1
 
         if verbose:
-            print("model: ", self.model)
             print("target: ", target)
-            print("target length: ", len(self.tokenizer(target)['input_ids']))
-            print("target decoded: ", self.tokenizer.decode(self.tokenizer(target)['input_ids']))
+            print("target length (str): ", len(target.split()))
+            print("target length (tokenizer): ", len(self.tokenizer(target)['input_ids']))
+            decoded = self.tokenizer.convert_ids_to_tokens(self.tokenizer(target)['input_ids'])
+            print("target decoded: ", decoded)
             print("output type:", type(outputs))
             print(outputs.keys())
             print("outputs.sequences: ", outputs.sequences)
             print("summary:", self.tokenizer.decode(outputs.sequences[0]))
-            print("summary length: ", len(outputs.sequences[0]))
+            print("summary length: ", len(outputs.sequences[0]))    
+            # print("model: ", self.model)
             print("len(attentions): ", len(attentions))
             print("len(attentions[0]): ", len(attentions[0]))
             print("len(attentions[0][0]): ", attentions[0][0].shape)
-            print("attentions_target: ", attentions_target)
+            print("attentions_target: ", attention_target)
+            # print("softmax(attention_target): ", F.softmax(attention_target, dim=0)) # not useful because the attention scores are already normalized, sum to 1
+            print("normalized attention_target: ", attention_target / attention_target.max())
+            print(sum(attention_target)) # =1
+            print(len(decoded) == len(attention_target))
+            print(list(zip(decoded, attention_target)))
 
 
 
