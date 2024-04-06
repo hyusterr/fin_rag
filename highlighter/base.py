@@ -67,8 +67,9 @@ class BaseHighlighter:
 
             else:
                 smooth_tokenids.append(label)
-
-        
+    
+        i, spans = 0, []
+        tmp = []
         for label in smooth_tokenids:
             if label:
                 tmp.append(i)

@@ -36,7 +36,7 @@ class AttnHighlighter(BaseHighlighter):
             self, 
             model_name='human-centered-summarization/financial-summarization-pegasus', 
             method='summarization', 
-            device='cuda:2', 
+            device='cuda:1', 
             load_pipe=False
         ):
         # TODO: hf now supports device_map='auto', which will automatically select the device, see: https://huggingface.co/docs/accelerate/v0.22.0/en/concept_guides/big_model_inference
@@ -100,19 +100,19 @@ class AttnHighlighter(BaseHighlighter):
             verbose: bool = True
         ):
         
-        return_dict = {}
+        outputs = {}
 
         # get the prediction of the target
-        tokenized_inputs, outputs = self.predict(target, output_attentions=True)
+        tokenized_inputs, predictions = self.predict(target, output_attentions=True)
         # print(type(outputs)) # GenerateBeamEncoderDecoderOutput or GenerateEncoderDecoderOutput
     
 
         # get the attention scores of each token in the target w.r.t. the prediction
         if self.method == 'text-classification':
-            attentions = outputs.attentions
+            attentions = predictions.attentions
         elif self.method == 'summarization':
             # TODO: decide to use encoder_attentions or cross_attentions or decoder_attentions
-            attentions = outputs.cross_attentions 
+            attentions = predictions.cross_attentions 
 
         # attentions shape: (num_generated_tokens, num_layers, num_beams, num_heads, 1(one generated token), num_target_tokens), with the first and second dimensions are store in tuples
         # pegasus has 16 layers and 16 heads for encoder and decoder respectively
@@ -123,31 +123,50 @@ class AttnHighlighter(BaseHighlighter):
         # dim: the dimension to reduce; .squeeze() remove the dimension with size 1
         # here, sum(attention_target) = 1, because the attention scores are normalized, this shall be transformed to a sequece of probabilities, i.e. each element's max value is 1 after combine subwords
 
-        decoded = self.tokenizer.convert_ids_to_tokens(self.tokenizer(target)['input_ids'])
-        assert len(decoded) == len(attention_target)
+        assert len(tokenized_inputs['input_ids'][0]) == len(attention_target)
+        words_tgt = target.split()
+        # TODO: HF's tokenizer has a optimized version for pre-split input text, refer to JH's code to unify the process variable naming
+        # if 2+ subwords are combined, the attention scores should be combined as well: use addtion since the numbers are often torn apart
+        word_attentions_tgt = [0] * len(words_tgt)
+        for i in range(len(tokenized_inputs['input_ids'][0])):
+            word_id = tokenized_inputs.token_to_word(i)
+            if word_id is not None:
+                word_attentions_tgt[word_id] += attention_target[i].item()
+        word_attentions_tgt = np.array(word_attentions_tgt)
+        word_probs_tgt = word_attentions_tgt / word_attentions_tgt.max() # normalize the attention scores
+        outputs['words_tgt'] = words_tgt
+        outputs['words_probs_tgt'] = word_probs_tgt
 
-        # if 2+ subwords are combined, the attention scores should be combined as well
-        for i, token in enumerate(decoded):
-            if self.tokenizer.is_token_part(token):
-                print(token)
-                break
+        if mean_aggregate: # the attn_highlighter does not need this, just for compatibility
+            outputs['words_probs_tgt_mean'] = word_probs_tgt
 
+        if label_threshold:
+            assert 'words_probs_tgt_mean' in outputs
+            outputs['words_label_tgt_mean'] = (word_probs_tgt > label_threshold).astype(int)
 
-                  
+        if generate_spans:
+            assert 'words_label_tgt_mean' in outputs
+            outputs['words_label_tgt_smooth'], outputs['highlight_spans_smooth'] = self.generate_highlight_spans(outputs['words_tgt'], outputs['words_label_tgt_mean'])
 
-        # get the top-K tokens with the highest attention scores, return label=1
+        # DIFF vs ORIGINAL: get the top-K tokens with the highest attention scores, return label=1
 
         if verbose:
             print("target: ", target)
             print("target length (str): ", len(target.split()))
             print("target length (tokenizer): ", len(self.tokenizer(target)['input_ids']))
+            print("target tokenized: ", tokenized_inputs)
+            decoded = self.tokenizer.convert_ids_to_tokens(tokenized_inputs['input_ids'][0])
+            for i in range(len(tokenized_inputs['input_ids'][0])):
+                print("tokenized_inputs: ", tokenized_inputs['input_ids'][0][i])
+                print("decoded: ", decoded[i])
+                print("tokenized_inputs.token_to_word: ", tokenized_inputs.token_to_word(i))
             decoded = self.tokenizer.convert_ids_to_tokens(self.tokenizer(target)['input_ids'])
             print("target decoded: ", decoded)
-            print("output type:", type(outputs))
-            print(outputs.keys())
-            print("outputs.sequences: ", outputs.sequences)
-            print("summary:", self.tokenizer.decode(outputs.sequences[0]))
-            print("summary length: ", len(outputs.sequences[0]))    
+            print("predictions type:", type(predictions))
+            print(predictions.keys())
+            print("predictions.sequences: ", predictions.sequences)
+            print("summary:", self.tokenizer.decode(predictions.sequences[0]))
+            print("summary length: ", len(predictions.sequences[0]))    
             # print("model: ", self.model)
             print("len(attentions): ", len(attentions))
             print("len(attentions[0]): ", len(attentions[0]))
@@ -158,10 +177,11 @@ class AttnHighlighter(BaseHighlighter):
             print(sum(attention_target)) # =1
             print(len(decoded) == len(attention_target))
             print(list(zip(decoded, attention_target)))
+            print(outputs)
+
+        return outputs
 
 
 
 
-        # get smoothed label for each token
 
-        # get the smoothed span
