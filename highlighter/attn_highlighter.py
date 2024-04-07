@@ -36,17 +36,22 @@ class AttnHighlighter(BaseHighlighter):
             self, 
             model_name='human-centered-summarization/financial-summarization-pegasus', 
             method='summarization', 
-            device='cuda:1', 
+            device='cpu', 
             load_pipe=False
         ):
         # TODO: hf now supports device_map='auto', which will automatically select the device, see: https://huggingface.co/docs/accelerate/v0.22.0/en/concept_guides/big_model_inference
         self.device = device
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        if 'roberta' in model_name.lower():
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name, add_prefix_space=True)
+        else:
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.max_length = self.tokenizer.model_max_length
         if method == 'text-classification':
             self.model = AutoModelForSequenceClassification.from_pretrained(model_name).to(device)
         elif method == 'summarization':
             self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
+        else:
+            raise ValueError(f"method {method} is not supported.")
         self.method = method
         self.model.eval()
         self.pipe = None
@@ -57,15 +62,25 @@ class AttnHighlighter(BaseHighlighter):
                 self.pipe = pipeline("summarization", model=model_name, device=device)
 
     # TODO: window sliding if a text is too long
-    def predict(self, text: List[str], output_attentions=False):
+    def predict(self, text: List[str], pretokenzied=False, output_attentions=False):
         '''
         text example: ["The stock price of Apple Inc. has increased by 10% after the announcement of the new iPhone 13.", "The stock price of Apple Inc. has increased by 10% after the announcement of the new iPhone 13."]
         '''
+        # TODO: WIP; do not use pipeline for now
         if self.pipe is not None and not output_attentions:
             out = self.pipe(text, output_attentions=output_attentions)
             return None, out
+
+        if not pretokenzied:
+            text = text.split()
         
-        inputs = self.tokenizer(text, return_tensors='pt', padding=True, truncation=True).to(self.device) # use intrinsic padding and truncation wrt. max_length
+        inputs = self.tokenizer(
+                text, 
+                return_tensors='pt', 
+                padding=True, 
+                is_split_into_words=True,
+                truncation=True
+                ).to(self.device) # use intrinsic padding and truncation wrt. max_length
         with torch.no_grad():
             if self.method == 'text-classification':
                 outputs = self.model(**inputs, output_attentions=output_attentions, return_dict=True)
@@ -109,31 +124,42 @@ class AttnHighlighter(BaseHighlighter):
 
         # get the attention scores of each token in the target w.r.t. the prediction
         if self.method == 'text-classification':
-            attentions = predictions.attentions
+            attentions = predictions.attentions, # tuplize to be consistent with summarization case
+            # shape: (1 (output label), batch_size, num_heads, num_tokens, num_tokens)
         elif self.method == 'summarization':
             # TODO: decide to use encoder_attentions or cross_attentions or decoder_attentions
-            attentions = predictions.cross_attentions 
+            attentions = predictions.cross_attentions
+
+
 
         # attentions shape: (num_generated_tokens, num_layers, num_beams, num_heads, 1(one generated token), num_target_tokens), with the first and second dimensions are store in tuples
         # pegasus has 16 layers and 16 heads for encoder and decoder respectively
         # get the average attention scores of each token in the target w.r.t. the prediction
         attention_target = torch.stack([torch.stack(a) for a in attentions]) # shape: (num_generated_tokens, num_layers, num_beams, num_heads, 1, num_target_tokens) # first 2 dimensions are stored in tuples, so .stack() twice
         # get the average attention scores of each target token, shape (num_target_tokens, 1)
+        if self.method == 'text-classification':
+            # attention_target = attention_target.unsqueeze(0)
+            print("attention_target shape: ", attention_target.shape)
+        # TODO: is mean() the right way to aggregate the attention scores?
         attention_target = attention_target.mean(dim=(0, 1, 2, 3, 4)).squeeze() # shape: (num_target_tokens, 1)
         # dim: the dimension to reduce; .squeeze() remove the dimension with size 1
         # here, sum(attention_target) = 1, because the attention scores are normalized, this shall be transformed to a sequece of probabilities, i.e. each element's max value is 1 after combine subwords
 
         assert len(tokenized_inputs['input_ids'][0]) == len(attention_target)
+    
         words_tgt = target.split()
         # TODO: HF's tokenizer has a optimized version for pre-split input text, refer to JH's code to unify the process variable naming
         # if 2+ subwords are combined, the attention scores should be combined as well: use addtion since the numbers are often torn apart
+        # BUG: the BatchEncoding.token_to_word() method is not working as expected when text is not pre-tokenized
         word_attentions_tgt = [0] * len(words_tgt)
         for i in range(len(tokenized_inputs['input_ids'][0])):
-            word_id = tokenized_inputs.token_to_word(i)
+            # TODO: assume batch_size=1, so the first dimension is 0
+            word_id = tokenized_inputs.token_to_word(0, i) 
             if word_id is not None:
                 word_attentions_tgt[word_id] += attention_target[i].item()
         word_attentions_tgt = np.array(word_attentions_tgt)
         word_probs_tgt = word_attentions_tgt / word_attentions_tgt.max() # normalize the attention scores
+        # TODO: the natural of attention after softmax make the sum of attention scores to 1, which may cause only one or two token pass the threshold
         outputs['words_tgt'] = words_tgt
         outputs['words_probs_tgt'] = word_probs_tgt
 
@@ -164,9 +190,17 @@ class AttnHighlighter(BaseHighlighter):
             print("target decoded: ", decoded)
             print("predictions type:", type(predictions))
             print(predictions.keys())
-            print("predictions.sequences: ", predictions.sequences)
-            print("summary:", self.tokenizer.decode(predictions.sequences[0]))
-            print("summary length: ", len(predictions.sequences[0]))    
+            if self.method == 'text-classification':
+                print("predictions.logits: ", predictions.logits)
+                print("predictions.logits.shape: ", predictions.logits.shape)
+                print("predictions.logits.softmax: ", F.softmax(predictions.logits, dim=1))
+                predicted_label = predictions.logits.argmax().item()
+                print("predictions.logits.argmax: ", predicted_label)
+                print("predicted_label: ", self.model.config.id2label[predicted_label])
+            elif self.method == 'summarization':
+                print("predictions.sequences: ", predictions.sequences)
+                print("summary:", self.tokenizer.decode(predictions.sequences[0]))
+                print("summary length: ", len(predictions.sequences[0]))    
             # print("model: ", self.model)
             print("len(attentions): ", len(attentions))
             print("len(attentions[0]): ", len(attentions[0]))
