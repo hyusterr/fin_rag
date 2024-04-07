@@ -19,6 +19,8 @@ class BaseHighlighter:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
         
+        self.method = None
+        
 
     def highlight_outputs(
             self, 

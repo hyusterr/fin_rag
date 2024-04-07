@@ -19,6 +19,7 @@ to $0.23 per share beginning in
 of
 of
 --------------------------------------------------
+[summary] prediction: <pad> Exxon Mobil raised its dividend by 50% to $0.23 per share.</s>
 [highlight prob. (mean)] truth: [0.    0.333 0.333 0.333 0.333 0.667 0.667 1.    1.    1.    1.    1.
  1.    1.    1.    1.    1.    1.    0.667 1.    1.    1.    1.    1.
  1.    1.    1.    1.    1.    0.333 0.333 0.333 0.333 0.    0.    0.333
@@ -67,6 +68,7 @@ of
 of
 write-off of the
 --------------------------------------------------
+[summary] prediction: <pad> End of the purchase agreement for the shares in the Softbank arm.</s>
 [highlight prob. (mean)] truth: [0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.
  0.    0.    0.    0.    0.    0.667 0.667 0.667 1.    1.    1.    1.
  1.    1.    1.    1.    1.    1.    1.    1.    1.    1.    1.    1.
@@ -116,6 +118,7 @@ bermekimab
 to
 to bermekimab from xbiotech,
 --------------------------------------------------
+[summary] prediction: <pad> termination of bermekimab development for ad indication.</s>
 [highlight prob. (mean)] truth: [0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.333
  0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333
  1.    1.    1.    1.    1.    1.    1.    1.    1.    0.333 0.333 0.667
@@ -176,6 +179,7 @@ on
 of
 in future periods,
 --------------------------------------------------
+[summary] prediction: <pad> Hilton Worldwide, Inc. issues 3.625% senior notes due 2032 to extend debt maturities</s>
 [highlight prob. (mean)] truth: [0.    0.    0.    0.    0.    0.    0.    0.    0.    0.333 0.333 0.
  0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.
  0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.667
@@ -237,6 +241,7 @@ not have a material impact on our results of
 audited,
 on
 --------------------------------------------------
+[summary] prediction: <pad> Acquisition of roadie did not have a material impact on results of operations.</s>
 [highlight prob. (mean)] truth: [0.    0.    0.    0.667 1.    1.    1.    1.    1.    0.667 0.667 0.667
  0.667 0.667 0.667 0.667 0.667 1.    1.    1.    0.    0.    0.    0.
  0.    0.    0.    0.    0.    0.    0.667 1.    1.    1.    1.    1.

@@ -114,11 +114,14 @@ class Task1:
                     print(span)
                 print(f"[highlight spans] prediction:")
                 print([highlight_result['words_tgt'][i] for i in range(len(highlight_result['words_tgt'])) if highlight_result['words_label_tgt_mean'][i] == 1])
-
                 print(f"[highlight spans] prediction (smoothed):")
                 for span in highlight_result['highlight_spans_smooth']:
                     print(span)
                 print("-"*50)
+                if self.highlighter.method == "text-classification":
+                    print("[classification label] prediction:", highlight_result['predictions'])
+                elif self.highlighter.method == "summarization":
+                    print("[summary] prediction:", highlight_result['predictions'])
                 print("[highlight prob. (mean)] truth:", np.array(truth['highlight_probs']).round(3))
                 print("[highlight prob. (mean)] prediction:", highlight_result['words_probs_tgt_mean'].round(3))
                 print("-"*50)

@@ -181,8 +181,12 @@ class AttnHighlighter(BaseHighlighter):
         if generate_spans:
             assert 'words_label_tgt_mean' in outputs
             outputs['words_label_tgt_smooth'], outputs['highlight_spans_smooth'] = self.generate_highlight_spans(outputs['words_tgt'], outputs['words_label_tgt_mean'])
-
         # DIFF vs ORIGINAL: get the top-K tokens with the highest attention scores, return label=1
+
+        if self.method == 'text-classification':
+            outputs['predictions'] = self.model.config.id2label[predictions.logits.argmax().item()]
+        elif self.method == 'summarization':
+            outputs['predictions'] = self.tokenizer.decode(predictions.sequences[0])
 
         if verbose:
             print("target: ", target)
