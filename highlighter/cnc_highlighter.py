@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from transformers import AutoTokenizer
 from .cnc_highlighting.encode import BertForHighlightPrediction
 # from ..utils.utils import retrieve_paragraph_from_docid
@@ -17,6 +18,7 @@ class CncBertHighlighter:
             max_length: int = 512,
             mean_aggregate: bool = False,
             label_threshold: float = 0.5,
+            select_topk: int = 5,
             generate_spans: bool = False,
         ):
 
@@ -63,6 +65,10 @@ class CncBertHighlighter:
         if label_threshold:
             assert 'words_probs_tgt_mean' in outputs
             outputs['words_label_tgt_mean'] = (outputs['words_probs_tgt_mean'] > label_threshold).astype(int)
+
+        if select_topk:
+            assert 'words_probs_tgt_mean' in outputs
+            outputs['words_label_tgt_mean'] = (word_probs_tgt > np.sort(word_probs_tgt)[-select_topk]).astype(int)
 
         if generate_spans:
             assert 'words_label_tgt_mean' in outputs
