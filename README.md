@@ -11,7 +11,7 @@ python3 task1_eval.py \
     -m human-centered-summarization/financial-summarization-pegasus # or mrm8488/distilroberta-finetuned-financial-news-sentiment-analysis
     -tk 5 # use top 5 highest attention score in target as label
     -d cuda:0
-    -v | R.none_H.attn-sum.result
+    -v | tee R.none_H.attn-sum.result
 ```
 ### Evaluate Retrieval methods with CnC Highlighter on task1
 #### 1. Prepare the retrieval result
