@@ -133,6 +133,7 @@ class AttnHighlighter(BaseHighlighter):
             # shape: (1 (output label), batch_size, num_heads, num_tokens, num_tokens)
         elif self.method == 'summarization':
             # TODO: decide to use encoder_attentions or cross_attentions or decoder_attentions
+            # TODO: the original paper use extractive summarization model, here we use abstractive summarization model
             attentions = predictions.cross_attentions
 
 

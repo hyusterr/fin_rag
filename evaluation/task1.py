@@ -18,7 +18,7 @@ class Task1:
             retrieve_result_file, 
             truth_file, 
             label_threshold=0.5, 
-            get_top_k=False, 
+            get_top_k=0, 
             device='cpu', 
             verbose=False
         ):
@@ -50,17 +50,15 @@ class Task1:
             self.retrieve_result = None
 
     def evaluate(self):
-        # TODO: select_topk's spirit is duplicated with r-precision?
-    
-        # load the highlighter
-        # highlighter = AttnHighlighter(model_id, method, device=device)
+        # TODO: select_topk's spirit is duplicated with r-precision? 
     
         # collect all the predictions
         predictions = dict()
         # TODO: use batch or parallel to speed up
         for row in self.truths:
-
-            select_topk = sum(row["highlight_labels"]) if self.get_top_k else None
+            # if we assume we know how many words need to be higlight in advance, sounds strange!
+            # select_topk = sum(row["highlight_labels"]) if self.get_top_k else None
+            select_topk = self.get_top_k
             target_id = row['id']
             target_text = retrieve_paragraph_from_docid(target_id)
             paragraph_list, docid_list = None, None

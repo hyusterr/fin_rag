@@ -26,7 +26,7 @@ if __name__ == '__main__':
 
     # evaluation arguments
     parser.add_argument('--label_threshold', '-lt', type=float, default=0, help='use thresholding determine label')
-    parser.add_argument('--get_top_k', '-tk', default=0, help='use ranking method to determine label')
+    parser.add_argument('--get_top_k', '-tk', type=int, default=0, help='use ranking method to determine label')
     parser.add_argument('--device', '-d', type=str, default='cpu', help='the device to use')
     parser.add_argument('--verbose', '-v', action='store_true', help='print the details')
     args = parser.parse_args()
