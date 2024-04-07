@@ -1,0 +1,280 @@
+[target]
+20221028_10-K_320193_part2_item7_para7:	in october 2021, we completed the acquisition of roadie, a technology platform focused on same-day delivery services, for $586 million. the results of roadie are reported within supply chain solutions. the acquisition did not have a material impact on our results of operations for the year. see note 9 to the audited, consolidated financial statements for additional information on this transaction.
+--------------------------------------------------
+[highlight labels] truth: [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+[highlight labels] prediction: [0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 1 0 1 0 0 0 0 0 0 0 0 0 0
+ 1 1 0 0 0 0 0 0 0 0 0 0 0 0 1 1]
+[highlight labels] prediction (smoothed): [0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1]
+--------------------------------------------------
+[highlight spans] truth:
+april 2022, the company announced an increase to its program authorization from $315 billion to $405 billion and raised its quarterly dividend from $0.22 to $0.23 per share beginning in may
+the company repurchased $90.2 billion of its common stock and paid dividends and dividend equivalents of $14.8
+[highlight spans] prediction:
+['2022,', 'increase', 'raised', '$0.22', '$0.23', 'repurchased', '$90.2', '$14.8', 'billion.']
+[highlight spans] prediction (smoothed):
+2022,
+increase
+raised
+$0.22 to $0.23
+repurchased $90.2
+--------------------------------------------------
+[classification label] prediction: positive
+[highlight prob. (mean)] truth: [0.    0.333 0.333 0.333 0.333 0.667 0.667 1.    1.    1.    1.    1.
+ 1.    1.    1.    1.    1.    1.    0.667 1.    1.    1.    1.    1.
+ 1.    1.    1.    1.    1.    0.333 0.333 0.333 0.333 0.    0.    0.333
+ 0.333 1.    1.    1.    1.    1.    1.    1.    1.    1.    1.    1.
+ 1.    1.    1.    1.    1.   ]
+[highlight prob. (mean)] prediction: [0.11  0.204 0.301 0.114 0.111 0.211 0.155 0.378 0.153 0.126 0.14  0.213
+ 0.165 0.237 0.109 0.155 0.201 0.118 0.164 0.337 0.136 0.136 0.256 0.157
+ 0.411 0.159 0.391 0.111 0.102 0.138 0.116 0.118 0.27  0.157 0.283 0.115
+ 0.108 0.535 0.368 0.11  0.093 0.103 0.087 0.128 0.112 0.119 0.176 0.094
+ 0.114 0.146 0.106 0.314 1.   ]
+--------------------------------------------------
+metrics of this sample:
+{'correlation': 0.12381156890014762,
+ 'f1': 0.33333333333333337,
+ 'id': '20221028_10-K_320193_part2_item7_para7',
+ 'precision': 1.0,
+ 'r_precision': 0.94,
+ 'recall': 0.2,
+ 'rouge1': 0.34920634920634924,
+ 'rouge2': 0.19672131147540983,
+ 'rougeL': 0.34920634920634924,
+ 'rougeLsum': 0.34920634920634924}
++=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
+[target]
+20220318_10-K_1045810_part2_item7_para5:	in october 2021, we completed the acquisition of roadie, a technology platform focused on same-day delivery services, for $586 million. the results of roadie are reported within supply chain solutions. the acquisition did not have a material impact on our results of operations for the year. see note 9 to the audited, consolidated financial statements for additional information on this transaction.
+--------------------------------------------------
+[highlight labels] truth: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+[highlight labels] prediction: [0 0 0 0 0 0 1 0 0 0 0 0 0 0 1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0
+ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 1
+ 0 0 1 0 0 0 0 0 1]
+[highlight labels] prediction (smoothed): [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1]
+--------------------------------------------------
+[highlight spans] truth:
+nvidia and softbank announced the termination of the share purchase agreement whereby nvidia would have acquired arm from
+because of significant regulatory challenges preventing the completion of the
+intend to record in operating expenses a $1.36 billion charge in the first
+[highlight spans] prediction:
+['Termination', 'february', '2022,', 'softbank.', 'transaction.', '$1.36', 'write-off', 'prepayment', '2020.']
+[highlight spans] prediction (smoothed):
+Termination
+february 8, 2022,
+softbank.
+transaction.
+$1.36
+write-off of the prepayment
+--------------------------------------------------
+[classification label] prediction: negative
+[highlight prob. (mean)] truth: [0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.
+ 0.    0.    0.    0.    0.    0.667 0.667 0.667 1.    1.    1.    1.
+ 1.    1.    1.    1.    1.    1.    1.    1.    1.    1.    1.    1.
+ 0.    0.    0.    0.    0.    0.333 0.333 0.333 0.333 0.333 0.333 0.333
+ 0.333 0.333 0.333 0.333 0.    0.333 0.333 0.333 0.333 0.333 0.333 0.333
+ 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.    0.    0.    0.    0.
+ 0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.   ]
+[highlight prob. (mean)] prediction: [0.106 0.242 0.11  0.099 0.083 0.128 0.268 0.09  0.097 0.1   0.102 0.129
+ 0.147 0.099 0.257 0.143 0.26  0.196 0.134 0.183 0.198 0.14  0.221 0.091
+ 0.091 0.083 0.109 0.127 0.14  0.178 0.091 0.083 0.135 0.103 0.085 0.32
+ 0.102 0.093 0.133 0.086 0.18  0.124 0.091 0.105 0.1   0.146 0.128 0.06
+ 0.096 0.046 0.058 0.854 0.13  0.095 0.102 0.183 0.128 0.088 0.176 0.194
+ 0.302 0.104 0.169 0.098 0.081 0.075 0.094 0.05  0.092 0.081 0.181 0.137
+ 0.091 0.306 0.072 0.085 0.249 0.1   0.082 0.121 0.067 0.231 1.   ]
+--------------------------------------------------
+metrics of this sample:
+{'correlation': -0.04851772475487601,
+ 'f1': 0.10714285714285714,
+ 'id': '20220318_10-K_1045810_part2_item7_para5',
+ 'precision': 0.25,
+ 'r_precision': 0.5454545454545454,
+ 'recall': 0.06818181818181818,
+ 'rouge1': 0.21818181818181817,
+ 'rouge2': 0.07547169811320753,
+ 'rougeL': 0.14545454545454545,
+ 'rougeLsum': 0.14545454545454545}
++=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
+[target]
+20220217_10-K_200406_part2_item7_para42:	in october 2021, we completed the acquisition of roadie, a technology platform focused on same-day delivery services, for $586 million. the results of roadie are reported within supply chain solutions. the acquisition did not have a material impact on our results of operations for the year. see note 9 to the audited, consolidated financial statements for additional information on this transaction.
+--------------------------------------------------
+[highlight labels] truth: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+[highlight labels] prediction: [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0 0 0
+ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0
+ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 1 0 1 0 0 0 0 1]
+[highlight labels] prediction (smoothed): [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1]
+--------------------------------------------------
+[highlight spans] truth:
+information regarding efficacy became available which led the company to the decision to terminate the development of bermekimab for atopic dermatitis (ad). the company recorded an intangible asset impairment charge of approximately $0.6 billion related to an in-process research and development asset,
+the impairment charge is related to the ad indication and is a nonrecognized subsequent event and will be reflected in the first quarter 2022 financial
+[highlight spans] prediction:
+['bermekimab', '(ad).', 'bermekimab', '(jnj-77474462),', 'hidradenitis', 'statements.', 'bermekimab', 'xbiotech,', '2020.']
+[highlight spans] prediction (smoothed):
+bermekimab for atopic dermatitis (ad).
+bermekimab (jnj-77474462),
+hidradenitis
+statements.
+bermekimab from xbiotech,
+--------------------------------------------------
+[classification label] prediction: neutral
+[highlight prob. (mean)] truth: [0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.333
+ 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333
+ 1.    1.    1.    1.    1.    1.    1.    1.    1.    0.333 0.333 0.667
+ 0.667 0.667 0.667 0.667 0.667 0.667 0.667 0.667 0.667 0.333 0.333 0.333
+ 0.333 0.333 0.333 0.333 0.333 0.333 0.    0.    0.    0.    0.    0.
+ 0.    0.    0.    0.    0.    0.    0.    0.333 0.333 0.333 0.333 0.333
+ 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333
+ 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.    0.    0.
+ 0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.   ]
+[highlight prob. (mean)] prediction: [0.064 0.137 0.1   0.136 0.091 0.058 0.05  0.063 0.058 0.167 0.089 0.093
+ 0.066 0.09  0.102 0.079 0.069 0.096 0.048 0.062 0.075 0.052 0.079 0.067
+ 0.146 0.054 0.084 0.052 0.283 0.071 0.126 0.177 0.243 0.074 0.057 0.142
+ 0.11  0.084 0.07  0.149 0.132 0.081 0.062 0.214 0.073 0.084 0.072 0.073
+ 0.147 0.076 0.044 0.062 0.158 0.278 0.586 0.063 0.111 0.104 0.052 0.045
+ 0.088 0.053 0.079 0.07  0.247 0.2   0.213 0.081 0.09  0.087 0.062 0.085
+ 0.055 0.045 0.077 0.066 0.055 0.062 0.059 0.184 0.077 0.073 0.05  0.06
+ 0.048 0.085 0.059 0.045 0.05  0.07  0.081 0.062 0.899 0.067 0.058 0.112
+ 0.057 0.088 0.059 0.255 0.077 0.258 0.113 0.057 0.063 0.048 1.   ]
+--------------------------------------------------
+metrics of this sample:
+{'correlation': -0.03856391725683206,
+ 'f1': 0.17073170731707318,
+ 'id': '20220217_10-K_200406_part2_item7_para42',
+ 'precision': 0.5384615384615384,
+ 'r_precision': 0.6666666666666666,
+ 'recall': 0.10144927536231885,
+ 'rouge1': 0.12195121951219513,
+ 'rouge2': 0.1,
+ 'rougeL': 0.12195121951219513,
+ 'rougeLsum': 0.12195121951219513}
++=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
+[target]
+20220216_10-K_1585689_part2_item7_para74:	in october 2021, we completed the acquisition of roadie, a technology platform focused on same-day delivery services, for $586 million. the results of roadie are reported within supply chain solutions. the acquisition did not have a material impact on our results of operations for the year. see note 9 to the audited, consolidated financial statements for additional information on this transaction.
+--------------------------------------------------
+[highlight labels] truth: [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0]
+[highlight labels] prediction: [0 0 0 0 0 0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0
+ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0
+ 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ 0 0 0 0 0 0 1 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ 0 0 0 0 0 0 0 0 0 0 1]
+[highlight labels] prediction (smoothed): [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+--------------------------------------------------
+[highlight spans] truth:
+covid-19
+securing our liquidity position to be able to meet our obligations for the foreseeable future, including issuing senior notes, drawing down the available borrowing capacity of our $1.75 billion revolving credit facility and consummating the april 2020 pre-sale of hilton honors points to american express for $1.0 billion in
+we issued the 3.625% senior notes due 2032 to continue to extend debt maturities and reduce our cost of debt by repaying the outstanding 5.125% senior notes due
+had fully repaid the outstanding debt
+[highlight spans] prediction:
+['covid-19', 'pandemic,', 'crisis.', 'pre-sale', 'pre-sale").', '3.625%', '5.125%', '2026.', '2021.']
+[highlight spans] prediction (smoothed):
+covid-19 pandemic,
+crisis.
+pre-sale
+pre-sale").
+3.625%
+5.125% senior notes due 2026.
+--------------------------------------------------
+[classification label] prediction: positive
+[highlight prob. (mean)] truth: [0.    0.    0.    0.    0.    0.    0.    0.    0.    0.333 0.333 0.
+ 0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.
+ 0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.667
+ 0.667 0.667 0.667 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.333
+ 0.333 0.333 0.333 0.667 0.667 0.667 1.    1.    1.    1.    1.    1.
+ 1.    1.    1.    1.    1.    1.    1.    0.667 1.    1.    1.    1.
+ 1.    1.    1.    1.    1.    1.    1.    1.    1.    1.    1.    1.
+ 1.    0.    0.    0.    0.    0.    0.    0.    0.    0.333 1.    1.
+ 1.    1.    1.    1.    1.    0.667 0.667 0.667 0.667 0.667 0.667 0.667
+ 0.667 0.667 0.667 0.667 0.667 0.667 0.667 0.667 0.667 0.667 0.667 0.667
+ 0.333 0.333 0.    0.    0.    0.    0.    0.    0.    0.    0.    0.
+ 0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.
+ 0.333 0.333 0.333 0.333 0.333 0.333 0.333 0.    0.    0.    0.    0.
+ 0.    0.    0.   ]
+[highlight prob. (mean)] prediction: [0.053 0.08  0.053 0.05  0.064 0.087 0.057 0.05  0.062 0.245 0.23  0.089
+ 0.094 0.092 0.105 0.104 0.059 0.091 0.066 0.102 0.066 0.082 0.123 0.07
+ 0.097 0.073 0.063 0.054 0.072 0.067 0.047 0.874 0.069 0.082 0.101 0.14
+ 0.078 0.105 0.082 0.062 0.057 0.072 0.062 0.091 0.055 0.085 0.046 0.04
+ 0.065 0.099 0.081 0.083 0.058 0.153 0.094 0.092 0.053 0.067 0.076 0.079
+ 0.045 0.066 0.178 0.059 0.081 0.065 0.069 0.075 0.189 0.077 0.117 0.083
+ 0.208 0.064 0.132 0.079 0.095 0.093 0.126 0.07  0.09  0.192 0.065 0.048
+ 0.094 0.136 0.187 0.085 0.254 0.153 0.066 0.153 0.151 0.077 0.112 0.082
+ 0.213 0.065 0.088 0.077 0.117 0.103 0.09  0.069 0.121 0.078 0.155 0.065
+ 0.166 0.072 0.086 0.043 0.082 0.074 0.147 0.07  0.071 0.202 0.058 0.076
+ 0.073 0.204 0.104 0.084 0.073 0.088 0.124 0.058 0.079 0.063 0.057 0.07
+ 0.103 0.07  0.051 0.07  0.071 0.054 0.049 0.081 0.048 0.058 0.145 0.074
+ 0.095 0.079 0.144 0.061 0.064 0.067 0.062 0.054 0.044 0.067 0.056 0.064
+ 0.063 0.119 1.   ]
+--------------------------------------------------
+metrics of this sample:
+{'correlation': -0.041881906650153775,
+ 'f1': 0.18,
+ 'id': '20220216_10-K_1585689_part2_item7_para74',
+ 'precision': 0.75,
+ 'r_precision': 0.625,
+ 'recall': 0.10227272727272728,
+ 'rouge1': 0.20754716981132074,
+ 'rouge2': 0.13461538461538464,
+ 'rougeL': 0.20754716981132074,
+ 'rougeLsum': 0.20754716981132074}
++=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
+[target]
+20220222_10-K_1090727_part2_item7_para5:	in october 2021, we completed the acquisition of roadie, a technology platform focused on same-day delivery services, for $586 million. the results of roadie are reported within supply chain solutions. the acquisition did not have a material impact on our results of operations for the year. see note 9 to the audited, consolidated financial statements for additional information on this transaction.
+--------------------------------------------------
+[highlight labels] truth: [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+[highlight labels] prediction: [0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0 0
+ 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1]
+[highlight labels] prediction (smoothed): [0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+--------------------------------------------------
+[highlight spans] truth:
+we completed the acquisition of roadie, a technology platform focused on same-day delivery services, for $586
+the acquisition did not have a material impact on our results of operations for the
+[highlight spans] prediction:
+['2021,', 'roadie,', 'same-day', 'million.', 'roadie', 'solutions.', 'year.', 'audited,', 'transaction.']
+[highlight spans] prediction (smoothed):
+2021,
+roadie,
+same-day
+million. the results of roadie
+solutions.
+year.
+audited,
+--------------------------------------------------
+[classification label] prediction: neutral
+[highlight prob. (mean)] truth: [0.    0.    0.    0.667 1.    1.    1.    1.    1.    0.667 0.667 0.667
+ 0.667 0.667 0.667 0.667 0.667 1.    1.    1.    0.    0.    0.    0.
+ 0.    0.    0.    0.    0.    0.    0.667 1.    1.    1.    1.    1.
+ 1.    1.    1.    1.    1.    1.    1.    0.667 0.667 0.667 0.    0.
+ 0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.
+ 0.   ]
+[highlight prob. (mean)] prediction: [0.077 0.163 0.204 0.113 0.151 0.089 0.165 0.09  0.287 0.08  0.1   0.097
+ 0.088 0.076 0.215 0.104 0.154 0.103 0.154 0.228 0.091 0.109 0.057 0.165
+ 0.099 0.114 0.123 0.081 0.065 0.306 0.097 0.121 0.129 0.106 0.094 0.083
+ 0.091 0.141 0.108 0.092 0.1   0.052 0.088 0.072 0.068 0.232 0.128 0.111
+ 0.089 0.114 0.079 0.242 0.097 0.082 0.092 0.075 0.087 0.087 0.064 0.068
+ 1.   ]
+--------------------------------------------------
+metrics of this sample:
+{'correlation': -0.09023651999571919,
+ 'f1': 0.17777777777777776,
+ 'id': '20220222_10-K_1090727_part2_item7_para5',
+ 'precision': 0.3333333333333333,
+ 'r_precision': 0.5757575757575758,
+ 'recall': 0.12121212121212122,
+ 'rouge1': 0.2727272727272727,
+ 'rouge2': 0.14285714285714285,
+ 'rougeL': 0.2727272727272727,
+ 'rougeLsum': 0.2727272727272727}
++=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
+metrics of all samples:
+defaultdict(<class 'list'>,
+            {'correlation': -0.01907769995148668,
+             'f1': 0.19379713511420832,
+             'precision': 0.5743589743589743,
+             'r_precision': 0.6705757575757575,
+             'recall': 0.11862318840579711,
+             'rouge1': 0.2339227658877912,
+             'rouge2': 0.12993310741222897,
+             'rougeL': 0.21937731134233665,
+             'rougeLsum': 0.21937731134233665})
