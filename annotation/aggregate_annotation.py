@@ -1,6 +1,7 @@
 import json
 import string
 import argparse
+from tqdm.auto import tqdm
 from collections import OrderedDict
 
 TOPIC_MAP = {
@@ -35,7 +36,14 @@ def read_jsonl(file):
     with open(file, "r") as f:
         return [json.loads(line) for line in f]
 
-def aggregate_highlights(annotation_files, output_file, agreement_threshold=0):
+def read_trec(file):
+    '''
+    file: file to read
+    '''
+    with open(file, "r") as f:
+        return [line.strip().split() for line in f]
+
+def ggaggregate_highlights(annotation_files, output_file, agreement_threshold=0):
     '''
     annotation_files: list of annotation files
     - FORMAT (of a line): {
@@ -135,12 +143,37 @@ def aggregate_highlights(annotation_files, output_file, agreement_threshold=0):
         for sample in output.values():
             f.write(json.dumps(sample) + "\n")
 
+def aggregate_retrieval(annotation_files, output_file):
+    annotations = [read_trec(file) for file in annotation_files]
+    n_annotators = len(annotations)
+    output = OrderedDict()
+    for anno in annotations:
+        for sample in anno:
+            target_id, _, doc_id, score = sample
+            score = float(score)
+            if (target_id, doc_id) not in output:
+                output[(target_id, doc_id)] = []
+            output[(target_id, doc_id)].append(score)
+
+    # get average score and output
+    with open(output_file, "w") as f:
+        for (target_id, doc_id), score in output.items():
+            # trec qrel format: qid 0 docno relevance; see: https://github.com/joaopalotti/trectools
+            if len(score) != n_annotators:
+                print((target_id, doc_id), f"Number of annotators is not consistent: {len(score)} != {n_annotators}")
+            mean = sum(score) / len(score)
+            f.write(f"{target_id} 0 {doc_id} {round(mean, 4)}\n")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Aggregate annotation files")
     parser.add_argument("--annotation_files", "-as", nargs="+", help="Annotation files to aggregate")
     parser.add_argument("--output_file", "-o", help="Output file", default="output.jsonl")
+    parser.add_argument("--agreement_threshold", "-at", type=float, help="Threshold for agreement", default=0)
+    parser.add_argument("--task", "-t", help="Task to aggregate", choices=["highlight", "retrieval"], default="highlight")
     args = parser.parse_args()
 
-    aggregate_highlights(args.annotation_files, args.output_file)
+    if args.task == "retrieval":
+        aggregate_retrieval(args.annotation_files, args.output_file)
+    elif args.task == "highlight":
+        aggregate_highlights(args.annotation_files, args.output_file, args.agreement_threshold)
