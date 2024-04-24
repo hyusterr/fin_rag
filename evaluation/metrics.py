@@ -1,5 +1,7 @@
 import numpy as np
 import evaluate
+from trectools import TrecQrel, TrecRun, TrecEval
+# https://github.com/joaopalotti/trectools
 
 rouge = evaluate.load("rouge")
 def evaluate_a_pair_highlight(pred, truth): #, pred_threshold=0.5) -> dict:
@@ -81,3 +83,23 @@ def evaluate_a_pair_highlight(pred, truth): #, pred_threshold=0.5) -> dict:
     output.update(rouges)
 
     return output
+
+
+def evaluate_trec_qrels(preds, truths, K=10):
+    """
+    preds: filename of trec run format: target_id' 'Q0' 'doc_id' 'rank' 'score' 'run_id
+    truths: filename trec qrels format: target_id' '0' 'doc_id' 'relevance'
+    """
+    run = TrecRun(preds)
+    qrels = TrecQrel(truths)
+    evaluator = TrecEval(run, qrels)
+    # results = run.evaluate_run(qrels, per_query=True)
+    ndcg = evaluator.get_ndcg(depth=K)
+    # recall = evaluator.get_recall(depth=K)
+    precision = evaluator.get_precision(depth=K)
+    results = {
+        f"ndcg@{K}": ndcg,
+        # f"recall@{K}": recall,
+        f"precision@{K}": precision,
+    }
+    return results
