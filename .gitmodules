@@ -1,0 +1,3 @@
+[submodule "trectools"]
+	path = trectools
+	url = https://github.com/hyusterr/trectools
