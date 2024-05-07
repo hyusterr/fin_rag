@@ -4,6 +4,12 @@ from deepeval.models.base_model import DeepEvalBaseLLM
 from deepeval.metrics import AnswerRelevancyMetric, ContextualPrecisionMetric, ContextualRecallMetric, ContextualRelevancyMetric
 from deepeval.test_case import LLMTestCase
 
+RELEVENCE_PROMPT = """Please extract relevant sentences from the provided context that can potentially help answer the following question. 
+If no relevant sentences are found, or if you believe the question cannot be answered from the given context, return the phrase "Insufficient Information". 
+While extracting candidate sentences you’re not allowed to make any changes to sentences
+from given context."""
+
+MISTRAL_PROMPT = "<s>[INST]" + RELEVENCE_PROMPT + "[/INST]"
 
 class LocalLLM(DeepEvalBaseLLM):
     def __init__(
@@ -13,6 +19,10 @@ class LocalLLM(DeepEvalBaseLLM):
     ):
         self.model = model
         self.tokenizer = tokenizer
+
+        self.prompt = RELEVENCE_PROMPT
+        if "mistral" in model.name_or_path.lower():
+            self.prompt = MISTRAL_PROMPT
 
     def load_model(self):
         return self.model
