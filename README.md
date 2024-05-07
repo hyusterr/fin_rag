@@ -1,6 +1,6 @@
 # Fintext-RAG project in CFDA lab
 ## Usage
-- One need to also git clone the [customized trectools](https://github.com/hyusterr/trectools/tree/master) to the same directory as a submodule. 
+- One need to also git clone the [customized trectools](https://github.com/hyusterr/trectools/tree/recall) to the same directory as a submodule. 
 ```bash
 git clone git@github.com:hyusterr/fin.rag.git
 cd fin.rag
