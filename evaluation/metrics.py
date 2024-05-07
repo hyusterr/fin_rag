@@ -95,11 +95,11 @@ def evaluate_trec_qrels(preds, truths, K=10):
     evaluator = TrecEval(run, qrels)
     # results = run.evaluate_run(qrels, per_query=True)
     ndcg = evaluator.get_ndcg(depth=K)
-    # recall = evaluator.get_recall(depth=K)
+    recall = evaluator.get_recall(depth=K)
     precision = evaluator.get_precision(depth=K)
     results = {
         f"ndcg@{K}": ndcg,
-        # f"recall@{K}": recall,
+        f"recall@{K}": recall,
         f"precision@{K}": precision,
     }
     return results

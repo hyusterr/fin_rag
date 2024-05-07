@@ -6,8 +6,10 @@ class Task2:
         self.qrels = qrels_filename
         self.run = run_filename
 
-    def evaluate(self):
-
-        result = evaluate_trec_qrels(self.run, self.qrels)
+    def evaluate(self, trec=True, llm=True):
+        if trec:
+            result = evaluate_trec_qrels(self.run, self.qrels)
+        if llm:
+            pass
         pprint(result)
         return result
