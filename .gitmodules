@@ -1,3 +1,5 @@
 [submodule "trectools"]
 	path = trectools
 	url = https://github.com/hyusterr/trectools
+[submodule "trectools/"]
+	url = https://github.com/hyusterr/trectools/tree/recall
