@@ -4,7 +4,10 @@
 ```bash
 git clone git@github.com:hyusterr/fin.rag.git
 cd fin.rag
+pip install -r requirements.txt
 git clone git@github.com:hyusterr/trectools.git
+cd trectools
+git checkout recall
 pip install -e ./trectools/
 ```
 
