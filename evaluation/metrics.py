@@ -2,6 +2,10 @@ import numpy as np
 import evaluate
 from trectools import TrecQrel, TrecRun, TrecEval
 # https://github.com/joaopalotti/trectools
+from deepeval.metrics import ContextualRelevancyMetric
+from deepeval.test_case import LLMTestCase
+from deepeval import evaluate as evaluate_deepeval
+from utils.utils import retrieve_paragraph_from_docid
 
 rouge = evaluate.load("rouge")
 def evaluate_a_pair_highlight(pred, truth): #, pred_threshold=0.5) -> dict:
@@ -83,7 +87,7 @@ def evaluate_a_pair_highlight(pred, truth): #, pred_threshold=0.5) -> dict:
     output.update(rouges)
 
     return output
-
+# TODO: the granularity of the evaluation is not clear, e.g. the evaluation of the whole dataset or the evaluation of each pair
 
 def evaluate_trec_qrels(preds, truths, K=10):
     """
@@ -103,3 +107,25 @@ def evaluate_trec_qrels(preds, truths, K=10):
         f"precision@{K}": precision,
     }
     return results
+
+
+def evaluate_deepeval_context_relevancy(preds, llm, topK=10) -> dict:
+    """
+    preds: filename of trec run format: target_id' 'Q0' 'doc_id' 'rank' 'score' 'run_id
+    llm: a class inherit deepeval.models.base_model.DeepEvalBaseLLM
+    """
+    # usage ref: https://github.com/joaopalotti/trectools/blob/418c970c3c37bc8f3b3a99d8178e8f9893bce1d5/trectools/trec_eval.py#L668
+    run = TrecRun(preds).run_data
+    topX_result = run.groupby("query")["docid"].apply(lambda x: x.head(topK).tolist()).to_dict()
+    # already sort descending by score
+    deepeval_testcases = [
+            LLMTestCase(
+                input=retrieve_paragraph_from_docid(target_id),
+                actual_output=retrieve_paragraph_from_docid(target_id),
+                retrieval_context=[retrieve_paragraph_from_docid(doc_id) for doc_id in context_ids]
+                )
+            for target_id, context_ids in topX_result.items()
+            ]
+    cr_metric = ContextualRelevancyMetric(model=llm)
+    evaluate_deepeval(deepeval_testcases, [cr_metric])
+

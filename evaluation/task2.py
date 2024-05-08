@@ -1,4 +1,6 @@
-from evaluation.metrics import evaluate_trec_qrels
+from evaluation.metrics import evaluate_trec_qrels, evaluate_deepeval_context_relevancy
+from evaluation.deepeval import MistralDeepEvalLLM, MISTRAL_7B_INSTRUCT_2
+
 from pprint import pprint
 
 class Task2:
@@ -7,9 +9,14 @@ class Task2:
         self.run = run_filename
 
     def evaluate(self, trec=True, llm=True):
+        result = {}
         if trec:
-            result = evaluate_trec_qrels(self.run, self.qrels)
+            result.update(evaluate_trec_qrels(self.run, self.qrels))
         if llm:
-            pass
+            model = MistralDeepEvalLLM()
+            evaluate_deepeval_context_relevancy(self.run, model)
         pprint(result)
         return result
+
+
+
