@@ -51,3 +51,13 @@ python3 task1_eval.py \
 In order to keep naming consistency and make it easier to manage results, we recommend naming the retrieval result file (rf) as `result/{annotation_set_name}/{retrieval_method}_retrieval.trec` and the evaluation result file as `R.{retrieval_method}_H.{highlight_method}.result`. 
 The result file contains the evaluation result of the retrieval method and the highlighter. 
 For example, `cnc_retrieval.trec` contains the retrieval result of-CnC retrieval method and `R.cnc_H.cnc.result` contains the evaluation result of the CnC-retrieval method along with the CnC-highlighter.
+
+#### 3. Evaluate the retrieval result with IR metrics
+```bash
+python3 task2_eval.py \ 
+    -rf path/to/retrieval/result/in/TrecRun/format
+    -tf path/to/annatated/label/in/TrecQrel/format
+```
+
+#### 4. Evaluate the retrieval result with LLM metrics
+TBD.

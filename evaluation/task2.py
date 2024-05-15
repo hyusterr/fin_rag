@@ -13,11 +13,9 @@ class Task2:
         if trec:
             result.update(evaluate_trec_qrels(self.run, self.qrels))
         if llm:
-            pass
-            '''
             model = MistralDeepEvalLLM()
             evaluate_deepeval_context_relevancy(self.run, model)
-            '''
+
         pprint(result)
         return result
 

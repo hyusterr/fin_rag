@@ -1,4 +1,5 @@
 import os
+import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from deepeval.models.base_model import DeepEvalBaseLLM
 from deepeval.metrics import AnswerRelevancyMetric, ContextualPrecisionMetric, ContextualRecallMetric, ContextualRelevancyMetric
@@ -29,6 +30,7 @@ class MistralDeepEvalLLM(DeepEvalBaseLLM):
         self.tokenizer = AutoTokenizer.from_pretrained(MISTRAL_7B_INSTRUCT_2)
         # TODO: check how to revise the prompt since mistral-intstruct has special token [INST]
         self.prompt = MISTRAL_PROMPT
+        self.device = torch.device('cuda')
 
     def get_model_name(self):
         '''
@@ -50,7 +52,7 @@ class MistralDeepEvalLLM(DeepEvalBaseLLM):
         # TODO: check how to add special token [INST] to the prompt, this would be critical for mistral-instruct models
         model = self.load_model() # assume already use device_map='auto'
 
-        model_inputs = self.tokenizer([prompt], return_tensors="pt")
+        model_inputs = self.tokenizer([prompt], return_tensors="pt").to(self.device)
 
         generated_ids = model.generate(**model_inputs, max_new_tokens=100, do_sample=True)
         return self.tokenizer.batch_decode(generated_ids)[0]
