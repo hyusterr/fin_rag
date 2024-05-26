@@ -89,6 +89,24 @@ def evaluate_a_pair_highlight(pred, truth): #, pred_threshold=0.5) -> dict:
     return output
 # TODO: the granularity of the evaluation is not clear, e.g. the evaluation of the whole dataset or the evaluation of each pair
 
+def evaluate_spans_in_a_pair_highlight(pred, truth):
+    # check if the id matches
+    assert pred["id"] == truth["id"], f"ID mismatch: {pred['id']} vs {truth['id']}"
+    # check if the length matches
+    assert len(pred["highlight_spans_smooth"]) == len(truth["highlight_spans"]), f"Length mismatch: {len(pred['highlight_spans_smooth'])} vs {len(truth['highlight_spans'])}"
+
+    # get the spans in truth # 
+
+    # evaluate the metrics by spans
+
+    # average the result of each span as the span-level evaluation
+
+    # return the metrics
+
+
+
+
+
 def evaluate_trec_qrels(preds, truths, K=10):
     """
     preds: filename of trec run format: target_id' 'Q0' 'doc_id' 'rank' 'score' 'run_id
