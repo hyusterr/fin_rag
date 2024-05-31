@@ -1,13 +1,61 @@
 import numpy as np
 import evaluate
+from sklearn.metrics import roc_auc_score
 from trectools import TrecQrel, TrecRun, TrecEval
 # https://github.com/joaopalotti/trectools
 from deepeval.metrics import ContextualRelevancyMetric
 from deepeval.test_case import LLMTestCase
 from deepeval import evaluate as evaluate_deepeval
 from utils.utils import retrieve_paragraph_from_docid
-
 rouge = evaluate.load("rouge")
+
+def r_precision(pred, truth):
+    """
+    Evaluate the R-Precision.
+    - pred: list of predicted probability, e.g. [0.1, 0.9, 0.2, ...]
+    - truth: list of truth, e.g. [0, 1, 0, ...]
+    """
+    r_truth = sum(truth)
+    truth_index = [i for i, t in enumerate(truth) if t == 1]
+    topr_pred_index = sorted(range(len(pred)), key=lambda i: pred[i], reverse=True)[:r_truth]
+    r_precision = len(set(truth_index) & set(topr_pred_index)) / r_truth if r_truth > 0 else 0
+    return r_precision
+
+def precision_recall_f1(pred, truth):
+    """
+    Evaluate the precision, recall, and F1.
+    - pred: list of predictions, e.g. [0, 1, 0, ...]
+    - truth: list of truth, e.g. [0, 1, 0, ...]
+    """
+    tp = sum([1 for p, t in zip(pred, truth) if p == 1 and t == 1])
+    fp = sum([1 for p, t in zip(pred, truth) if p == 1 and t == 0])
+    fn = sum([1 for p, t in zip(pred, truth) if p == 0 and t == 1])
+    tn = sum([1 for p, t in zip(pred, truth) if p == 0 and t == 0])
+    precision = tp / (tp + fp) if tp + fp > 0 else 0
+    recall = tp / (tp + fn) if tp + fn > 0 else 0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
+    return precision, recall, f1
+
+
+def correlation(pred, truth):
+    """
+    Evaluate the correlation.
+    - pred: list of predictions of probability, e.g. [0.1, 0.9, 0.2, ...]
+    - truth: list of voting probability, e.g. [0.1, 0.9, 0.2, ...]
+    """
+    correlation = np.corrcoef(truth, pred)[0, 1]
+    return correlation
+
+def auc(pred, truth):
+    """
+    Evaluate the AUC.
+    - pred: list of predictions of probability, e.g. [0.1, 0.9, 0.2, ...]
+    - truth: list of truth, e.g. [0, 1, 0, ...]
+    """
+    auc = roc_auc_score(truth, pred)
+    return auc
+
+
 def evaluate_a_pair_highlight(pred, truth): #, pred_threshold=0.5) -> dict:
     """
     Evaluate a pair of predictions and truth.
@@ -37,29 +85,24 @@ def evaluate_a_pair_highlight(pred, truth): #, pred_threshold=0.5) -> dict:
     assert len(pred["words_probs_tgt_mean"]) == len(truth["highlight_probs"]), f"Length mismatch: {len(pred['pred_prob'])} vs {len(truth['highlight_probs'])}"
 
     # Convert the prediction to binary 
-    # TODO: not sure if threshold is a parameter of evaluation or a parameter of prediction
+    # TODO: not sure if threshold is a parameter of evaluation or a parameter of prediction --> fixed to 0.5
     # pred_bin = [1 if p > pred_threshold else 0 for p in pred["pred_prob"]]
     pred_bin = pred["words_label_tgt_smooth"]
-    # Calculate the R-Precision
+    pred_prob = pred["words_probs_tgt_mean"]
 
-    r_truth = sum(truth["highlight_labels"])
-    truth_index = [i for i, t in enumerate(truth["highlight_labels"]) if t == 1]
-    topr_pred_index = sorted(range(len(pred["words_probs_tgt_mean"])), key=lambda i: pred["words_probs_tgt_mean"][i], reverse=True)[:r_truth]
-    r_precision = len(set(truth_index) & set(topr_pred_index)) / r_truth if r_truth > 0 else 0
+    truth_bin = truth["highlight_labels"]
+    truth_prob = truth["highlight_probs"]
+    # Calculate the R-Precision
+    r_precision = r_precision(pred_prob, truth_bin)
+
 
     # calculate the correlation 
-    if np.std(truth["highlight_probs"]) != 0:
-        correlation = np.corrcoef(truth["highlight_probs"], pred["words_probs_tgt_mean"])[0, 1] if r_truth > 0 else 0
+    assert np.std(truth_prob) != 0, "The standard deviation of truth is 0, cannot calculate the correlation"
+    correlation = correlation(pred_prob, truth_prob)
 
     # Calculate the metrics
-    tp = sum([1 for p, t in zip(pred_bin, truth["highlight_labels"]) if p == 1 and t == 1])
-    fp = sum([1 for p, t in zip(pred_bin, truth["highlight_labels"]) if p == 1 and t == 0])
-    fn = sum([1 for p, t in zip(pred_bin, truth["highlight_labels"]) if p == 0 and t == 1])
-    tn = sum([1 for p, t in zip(pred_bin, truth["highlight_labels"]) if p == 0 and t == 0])
-    # Calculate the precision, recall, and F1
-    precision = tp / (tp + fp) if tp + fp > 0 else 0
-    recall = tp / (tp + fn) if tp + fn > 0 else 0
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
+    precision, recall, f1 = precision_recall_f1(pred_bin, truth_bin)
+    auc = auc(pred_prob, truth_bin)
 
     # calculate ROUGEs
     # pred_tokens = [truth["tokens"][i] for i, p in enumerate(pred_bin) if p == 1] 
@@ -95,9 +138,18 @@ def evaluate_spans_in_a_pair_highlight(pred, truth):
     # check if the length matches
     assert len(pred["highlight_spans_smooth"]) == len(truth["highlight_spans"]), f"Length mismatch: {len(pred['highlight_spans_smooth'])} vs {len(truth['highlight_spans'])}"
 
-    # get the spans in truth # 
+    # get the spans in truth
+    spans_ids = [i for i, t in enumerate(truth["highlight_labels"]) if t == 1]
+    
 
     # evaluate the metrics by spans
+    # accuracy
+
+    # exact match
+
+    # AUC
+
+    # ROUGE (to extend the task to generation)
 
     # average the result of each span as the span-level evaluation
 
