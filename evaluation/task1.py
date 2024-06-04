@@ -8,7 +8,7 @@ import pandas as pd
 from collections import defaultdict
 from pathlib import Path
 from utils.utils import retrieve_paragraph_from_docid, read_jsonl
-from .metrics import evaluate_a_pair_highlight
+from .metrics import evaluate_a_pair_highlight, evaluate_spans_in_a_pair_highlight
 from pprint import pprint
 
 class Task1:
@@ -89,10 +89,14 @@ class Task1:
             highlight_result = predictions[target_id]
             paragraph_list = highlight_result['references']
             ref_ids = highlight_result['ref_ids']
-            # TODO: threshold setting duplicated, need to one of them
+            # TODO: threshold setting duplicated, need to one of them --> fix threshold = 0.5
             # TODO: need to unify naming of keys
-            metric_tmp = evaluate_a_pair_highlight(highlight_result, truth) #, threshold=0.5)
+            metric_tmp = evaluate_a_pair_highlight(highlight_result, truth)
+            metric_spans_tmp = evaluate_spans_in_a_pair_highlight(highlight_result, truth)
             for k, v in metric_tmp.items():
+                if k != 'id':
+                    metrics[k].append(v)
+            for k, v in metric_spans_tmp.items():
                 if k != 'id':
                     metrics[k].append(v)
 
@@ -126,7 +130,10 @@ class Task1:
                 print("[highlight prob. (mean)] prediction:", highlight_result['words_probs_tgt_mean'].round(3))
                 print("-"*50)
                 print(f"metrics of this sample:")
+                print('[sentence-level]')
                 pprint(metric_tmp)
+                print('[span-level]')
+                pprint(metric_spans_tmp)
                 print('+='*50)
                 print()
 

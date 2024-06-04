@@ -9,6 +9,7 @@ class CncBertHighlighter:
     def __init__(self, model_name: str = 'DylanJHJ/bert-base-final-v0-ep2', device: str = 'cpu'):
         self.device = torch.device(device)
         self.model = BertForHighlightPrediction.from_pretrained(model_name)
+        self.method = 'CnC'
         self.model.to(self.device)
     
     def highlighting_outputs(

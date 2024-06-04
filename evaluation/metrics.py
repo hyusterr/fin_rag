@@ -9,7 +9,7 @@ from deepeval import evaluate as evaluate_deepeval
 from utils.utils import retrieve_paragraph_from_docid
 rouge = evaluate.load("rouge")
 
-def r_precision(pred, truth):
+def get_r_precision(pred, truth):
     """
     Evaluate the R-Precision.
     - pred: list of predicted probability, e.g. [0.1, 0.9, 0.2, ...]
@@ -21,7 +21,7 @@ def r_precision(pred, truth):
     r_precision = len(set(truth_index) & set(topr_pred_index)) / r_truth if r_truth > 0 else 0
     return r_precision
 
-def precision_recall_f1(pred, truth):
+def get_precision_recall_f1(pred, truth):
     """
     Evaluate the precision, recall, and F1.
     - pred: list of predictions, e.g. [0, 1, 0, ...]
@@ -37,7 +37,7 @@ def precision_recall_f1(pred, truth):
     return precision, recall, f1
 
 
-def correlation(pred, truth):
+def get_correlation(pred, truth):
     """
     Evaluate the correlation.
     - pred: list of predictions of probability, e.g. [0.1, 0.9, 0.2, ...]
@@ -46,7 +46,7 @@ def correlation(pred, truth):
     correlation = np.corrcoef(truth, pred)[0, 1]
     return correlation
 
-def auc(pred, truth):
+def get_auc(pred, truth):
     """
     Evaluate the AUC.
     - pred: list of predictions of probability, e.g. [0.1, 0.9, 0.2, ...]
@@ -93,16 +93,16 @@ def evaluate_a_pair_highlight(pred, truth): #, pred_threshold=0.5) -> dict:
     truth_bin = truth["highlight_labels"]
     truth_prob = truth["highlight_probs"]
     # Calculate the R-Precision
-    r_precision = r_precision(pred_prob, truth_bin)
+    r_precision = get_r_precision(pred_prob, truth_bin)
 
 
     # calculate the correlation 
     assert np.std(truth_prob) != 0, "The standard deviation of truth is 0, cannot calculate the correlation"
-    correlation = correlation(pred_prob, truth_prob)
+    correlation = get_correlation(pred_prob, truth_prob)
 
     # Calculate the metrics
-    precision, recall, f1 = precision_recall_f1(pred_bin, truth_bin)
-    auc = auc(pred_prob, truth_bin)
+    precision, recall, f1 = get_precision_recall_f1(pred_bin, truth_bin)
+    auc = get_auc(pred_prob, truth_bin)
 
     # calculate ROUGEs
     # pred_tokens = [truth["tokens"][i] for i, p in enumerate(pred_bin) if p == 1] 
@@ -126,6 +126,7 @@ def evaluate_a_pair_highlight(pred, truth): #, pred_threshold=0.5) -> dict:
         "recall": recall,
         "f1": f1,
         "correlation": correlation,
+        "auc": auc,
     }
     output.update(rouges)
 
@@ -135,25 +136,64 @@ def evaluate_a_pair_highlight(pred, truth): #, pred_threshold=0.5) -> dict:
 def evaluate_spans_in_a_pair_highlight(pred, truth):
     # check if the id matches
     assert pred["id"] == truth["id"], f"ID mismatch: {pred['id']} vs {truth['id']}"
-    # check if the length matches
-    assert len(pred["highlight_spans_smooth"]) == len(truth["highlight_spans"]), f"Length mismatch: {len(pred['highlight_spans_smooth'])} vs {len(truth['highlight_spans'])}"
 
     # get the spans in truth
-    spans_ids = [i for i, t in enumerate(truth["highlight_labels"]) if t == 1]
+    tmp, spans_group_ids = [], []
+    for i, t in enumerate(truth["highlight_labels"]):
+        if t == 1:
+            tmp.append(i)
+        else:
+            if tmp != []:
+                spans_group_ids.append(tmp)
+            tmp = []
+    
+    # TODO: if there is no span in the truth, the evaluation shall be 0
+    if spans_group_ids == []:
+        return {
+            "id": pred["id"],
+            "span_accuracy": None,
+            "span_exact_match": None,
+            # "span_auc": None,
+        }
+
+    spans_group_pred_probs, spans_group_truth_probs = [], []
+    spans_group_pred_labels, spans_group_truth_labels = [], []
+    for group in spans_group_ids:
+        spans_group_pred_probs.append([pred["words_probs_tgt_mean"][i] for i in group])
+        spans_group_pred_labels.append([pred["words_label_tgt_smooth"][i] for i in group])
+
+        spans_group_truth_probs.append([truth["highlight_probs"][i] for i in group])
+        spans_group_truth_labels.append([truth["highlight_labels"][i] for i in group])
+
+    assert len(spans_group_pred_probs) == len(spans_group_truth_probs), "The number of spans in prediction and truth does not match"
     
 
     # evaluate the metrics by spans
     # accuracy
+    accuracy = [sum(p) / sum(t) if sum(t) > 0 else 0 for p, t in zip(spans_group_pred_labels, spans_group_truth_labels)]
+    accuracy = sum(accuracy) / len(accuracy)
 
     # exact match
-
+    # e.g. id = [1, 2, 4, 5]
+    # pred = [0.1, 0.9, 0.8, 0.8]
+    # exact_match = 0.5
+    each_exact_match = [1 if sum(p) == sum(t) else 0 for p, t in zip(spans_group_pred_labels, spans_group_truth_labels)]
+    exact_match = sum(each_exact_match) / len(each_exact_match)
+    
     # AUC
+    # auc = [roc_auc_score(t, p) for p, t in zip(spans_group_pred_probs, spans_group_truth_labels)]
+    # auc = sum(auc) / len(auc)
 
-    # ROUGE (to extend the task to generation)
+    # TODO: ROUGE (to extend the task to generation)
 
     # average the result of each span as the span-level evaluation
-
     # return the metrics
+    return {
+        "id": pred["id"],
+        "span_accuracy": accuracy,
+        "span_exact_match": exact_match,
+        # "span_auc": auc,
+    }
 
 
 

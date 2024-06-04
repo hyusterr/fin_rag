@@ -43,7 +43,7 @@ def read_trec(file):
     with open(file, "r") as f:
         return [line.strip().split() for line in f]
 
-def ggaggregate_highlights(annotation_files, output_file, agreement_threshold=0):
+def aggregate_highlights(annotation_files, output_file, agreement_threshold=0.5):
     '''
     annotation_files: list of annotation files
     - FORMAT (of a line): {
@@ -169,7 +169,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Aggregate annotation files")
     parser.add_argument("--annotation_files", "-as", nargs="+", help="Annotation files to aggregate")
     parser.add_argument("--output_file", "-o", help="Output file", default="output.jsonl")
-    parser.add_argument("--agreement_threshold", "-at", type=float, help="Threshold for agreement", default=0)
+    parser.add_argument("--agreement_threshold", "-at", type=float, help="Threshold for agreement", default=0.5)
     parser.add_argument("--task", "-t", help="Task to aggregate", choices=["highlight", "retrieval"], default="highlight")
     args = parser.parse_args()
 

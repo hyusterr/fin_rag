@@ -16,8 +16,10 @@ if __name__ == '__main__':
     # file arguments
     parser.add_argument('--truth_file', '-tf', type=str, help='the truth file')
     parser.add_argument('--retrieve_result_file', '-rf', type=str, help='the retrieve result file')
+    parser.add_argument('--trec', '-t', action='store_true', help='evaluate traditional IR metrics')
+    parser.add_argument('--llm', '-l', action='store_true', help='evaluate LLM metrics')
     
     args = parser.parse_args()
 
     task2 = Task2(args.retrieve_result_file, args.truth_file)
-    task2.evaluate()
+    task2.evaluate(args.trec, args.llm)
