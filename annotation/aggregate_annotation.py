@@ -68,9 +68,11 @@ def aggregate_highlights(annotation_files, output_file, agreement_threshold=0.5)
     n_annotators = len(annotations)
     output = OrderedDict()
     for anno in annotations:
-        for sample in anno:
+        for sample in tqdm(anno):
+            print(sample["id"])
             tokens = sample["text"].split() 
             normalized_tokens = [t.translate(str.maketrans('', '', string.punctuation)).lower() for t in tokens]    
+
             if sample["id"] not in output:
                 # TODO: use Spacy to tokenize
                 output[sample["id"]] = {
@@ -84,28 +86,35 @@ def aggregate_highlights(annotation_files, output_file, agreement_threshold=0.5)
                     "topic": [],
                     "subtopic": [],
                 }
-            span_tokens = [s.split() for s in sample["highlight"].split("|||")] # tokenized spans into tokens
-            # because some of the spans will include punctuation, we need to normalize the tokens
-            normalized_span_tokens = [[t.translate(str.maketrans('', '', string.punctuation)).lower() for t in s] for s in span_tokens]
 
-            # get the id of the tokens
-            span_already_checked = 0
-            i = 0
-            while i < len(tokens):
-                if span_already_checked == len(span_tokens):
-                    break
+            if sample["highlight"] != "":
+                span_tokens = [s.split() for s in sample["highlight"].split("|||")] # tokenized spans into tokens
+                # because some of the spans will include punctuation, we need to normalize the tokens
+                normalized_span_tokens = [[t.translate(str.maketrans('', '', string.punctuation)).lower() for t in s] for s in span_tokens] # span tokens without punctuation
 
-                if normalized_tokens[i] == normalized_span_tokens[span_already_checked][0]:
-                    print(normalized_tokens[i:i+len(span_tokens[span_already_checked])], normalized_span_tokens[span_already_checked])
-                    if normalized_tokens[i:i+len(normalized_span_tokens[span_already_checked])] == normalized_span_tokens[span_already_checked]:
-                        for j in range(len(span_tokens[span_already_checked])):
-                            output[sample["id"]]["highlight_probs"][i+j] += 1
-                        i += len(span_tokens[span_already_checked])
-                        span_already_checked += 1
+
+                # get the id of the tokens
+                span_already_checked = 0
+                i = 0
+                while i < len(tokens):
+                    if span_already_checked == len(span_tokens):
+                        break
+                    
+                    if normalized_tokens[i] == normalized_span_tokens[span_already_checked][0]:
+                        print(normalized_tokens[i:i+len(span_tokens[span_already_checked])], normalized_span_tokens[span_already_checked])
+                        # BUG: there might be highlights = "||| |||"
+                        if normalized_tokens[i:i+len(normalized_span_tokens[span_already_checked])] == normalized_span_tokens[span_already_checked]:
+                            for j in range(len(span_tokens[span_already_checked])):
+                                output[sample["id"]]["highlight_probs"][i+j] += 1
+                            i += len(span_tokens[span_already_checked])
+                            span_already_checked += 1
+                        else:
+                            i += 1
                     else:
                         i += 1
-                else:
-                    i += 1
+            else: # no highlight
+                for i in range(len(tokens)):
+                    output[sample["id"]]["highlight_probs"][i] += 0
 
             # collect type and topic
             type_ = max(sample["type"], key=sample["type"].get)
@@ -121,6 +130,7 @@ def aggregate_highlights(annotation_files, output_file, agreement_threshold=0.5)
     
     # calculate the average of highlight_probs
     for sample in output.values():
+        # BUG: duplicate highlights under an annotator, leads to probs > 1
         sample["highlight_probs"] = [p/n_annotators for p in sample["highlight_probs"]]
         sample["highlight_labels"] = [1 if p > agreement_threshold else 0 for p in sample["highlight_probs"]]
         # get the spans
