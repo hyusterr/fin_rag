@@ -10,6 +10,7 @@ from pathlib import Path
 from utils.utils import retrieve_paragraph_from_docid, read_jsonl
 from .metrics import evaluate_a_pair_highlight, evaluate_spans_in_a_pair_highlight
 from pprint import pprint
+from tqdm.auto import tqdm
 
 class Task1:
     def __init__(
@@ -55,7 +56,14 @@ class Task1:
         # collect all the predictions
         predictions = dict()
         # TODO: use batch or parallel to speed up
-        for row in self.truths:
+
+        if not self.verbose:
+            print("[Start highlighting...]")
+            iter_data = tqdm(self.truths)
+        else:
+            iter_data = self.truths
+
+        for row in iter_data:
             # if we assume we know how many words need to be higlight in advance, sounds strange!
             # select_topk = sum(row["highlight_labels"]) if self.get_top_k else None
             select_topk = self.get_top_k
@@ -82,9 +90,14 @@ class Task1:
             predictions[target_id]['references'] = paragraph_list
             predictions[target_id]['ref_ids'] = docid_list
 
+        if not self.verbose:
+            print("[Start evaluating...]")
+            iter_data = tqdm(self.truths)
+        else:
+            iter_data = self.truths
        
         metrics = defaultdict(list)
-        for truth in self.truths:
+        for truth in iter_data:
             target_id = truth['id']
             highlight_result = predictions[target_id]
             paragraph_list = highlight_result['references']
@@ -103,6 +116,7 @@ class Task1:
             if self.verbose:
                 print(f"[target]")
                 print(f"{target_id}:\t{target_text}")
+                print(f"type: {truth['type']}")
                 print("-"*50)
                 if paragraph_list is not None:
                     print(f"[references]: {len(paragraph_list)}")
@@ -141,9 +155,10 @@ class Task1:
 
         # calculate the average
         for k, v in metrics.items():
-            metrics[k] = sum(v) / len(v)
+            metrics[k] = np.nanmean(np.array(v))
 
         if self.verbose:
             print(f"metrics of all samples:")
+
         pprint(metrics)
         return metrics

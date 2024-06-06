@@ -97,12 +97,18 @@ def evaluate_a_pair_highlight(pred, truth): #, pred_threshold=0.5) -> dict:
 
 
     # calculate the correlation 
-    assert np.std(truth_prob) != 0, "The standard deviation of truth is 0, cannot calculate the correlation"
-    correlation = get_correlation(pred_prob, truth_prob)
+    if np.std(truth_prob) != 0:
+        correlation = get_correlation(pred_prob, truth_prob)
+    else:
+        correlation = np.nan
 
     # Calculate the metrics
     precision, recall, f1 = get_precision_recall_f1(pred_bin, truth_bin)
-    auc = get_auc(pred_prob, truth_bin)
+
+    if sum(truth_bin) == 0 or sum(truth_bin) == len(truth_bin):
+        auc = np.nan # auc needs 2 classes
+    else:
+        auc = get_auc(pred_prob, truth_bin)
 
     # calculate ROUGEs
     # pred_tokens = [truth["tokens"][i] for i, p in enumerate(pred_bin) if p == 1] 
@@ -130,6 +136,8 @@ def evaluate_a_pair_highlight(pred, truth): #, pred_threshold=0.5) -> dict:
     }
     output.update(rouges)
 
+    # print(output)
+
     return output
 # TODO: the granularity of the evaluation is not clear, e.g. the evaluation of the whole dataset or the evaluation of each pair
 
@@ -146,13 +154,17 @@ def evaluate_spans_in_a_pair_highlight(pred, truth):
             if tmp != []:
                 spans_group_ids.append(tmp)
             tmp = []
+    if tmp != []:
+        spans_group_ids.append(tmp)
+
+    # print("spans_group_ids", spans_group_ids)
     
     # TODO: if there is no span in the truth, the evaluation shall be 0
     if spans_group_ids == []:
         return {
             "id": pred["id"],
-            "span_accuracy": None,
-            "span_exact_match": None,
+            "span_accuracy": np.nan,
+            "span_exact_match": np.nan,
             # "span_auc": None,
         }
 
@@ -188,12 +200,18 @@ def evaluate_spans_in_a_pair_highlight(pred, truth):
 
     # average the result of each span as the span-level evaluation
     # return the metrics
-    return {
+
+    
+    output = {
         "id": pred["id"],
         "span_accuracy": accuracy,
         "span_exact_match": exact_match,
         # "span_auc": auc,
     }
+
+    # print(output)
+    
+    return output
 
 
 

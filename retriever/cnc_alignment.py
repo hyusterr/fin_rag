@@ -8,6 +8,7 @@ import evaluate
 from pathlib import Path
 from utils.utils import read_jsonl, retrieve_paragraph_from_docid
 from utils.config import FORMMATED_DIR
+from tqdm.auto import tqdm
 
 class CncAlignment:
     def __init__(self, topK=10, rouge_type='rouge2', tag="cnc_alignment"):
@@ -62,7 +63,7 @@ class CncAlignment:
 
     def align_all(self, targets):
         results = {}
-        for target in targets:
+        for target in tqdm(targets):
             results[target["id"]] = self.align(target)
         return results
 
