@@ -22,13 +22,13 @@ if __name__ == '__main__':
     parser.add_argument('--generate_pred', '-gp', help='generate prediction filename or True, which will set pred.jsonl as filename', default=False)
     
     # highlighter arguments
-    parser.add_argument('--highlighter', '-hl', type=str, default='attn', help='the highlighter to use')
+    parser.add_argument('--highlighter', '-hl', type=str, help='the highlighter to use')
     parser.add_argument('--model_id', '-m', type=str, help='the model id')
     parser.add_argument('--method', '-mt', type=str, default='summarization', help='the method to use in attn highlighter')
 
     # evaluation arguments
-    parser.add_argument('--label_threshold', '-lt', type=float, default=0, help='use thresholding determine label')
-    parser.add_argument('--get_top_k', '-tk', type=int, default=0, help='use ranking method to determine label')
+    parser.add_argument('--label_threshold', '-lt', type=float, default=0.5, help='use thresholding determine label')
+    parser.add_argument('--get_top_k', '-tk', type=int, help='use ranking method to determine label')
     parser.add_argument('--device', '-d', type=str, default='cpu', help='the device to use')
     parser.add_argument('--verbose', '-v', action='store_true', help='print the details')
     args = parser.parse_args()

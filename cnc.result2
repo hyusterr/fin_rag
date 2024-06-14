@@ -1,0 +1,16 @@
+use pre-generated prediction
+[Start highlighting...]
+[Start evaluating...]
+defaultdict(<class 'list'>,
+            {'auc': 0.5583899462780347,
+             'correlation': 0.047888745202893886,
+             'f1': 0.16271529955790726,
+             'precision': 0.4121643163498654,
+             'r_precision': 0.40841356718177757,
+             'recall': 0.11788075488618734,
+             'rouge1': 0.18063352246848624,
+             'rouge2': 0.1107919013735014,
+             'rougeL': 0.17431147554266788,
+             'rougeLsum': 0.17431147554266788,
+             'span_accuracy': 0.14315647710173135,
+             'span_exact_match': 0.011658263305322129})

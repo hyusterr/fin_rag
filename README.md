@@ -52,6 +52,29 @@ In order to keep naming consistency and make it easier to manage results, we rec
 The result file contains the evaluation result of the retrieval method and the highlighter. 
 For example, `cnc_retrieval.trec` contains the retrieval result of-CnC retrieval method and `R.cnc_H.cnc.result` contains the evaluation result of the CnC-retrieval method along with the CnC-highlighter.
 
+User can also prepare the highlighting result in JSON format, and then evaluate the highlighting result with the following command:
+```bash
+python3 task1_eval.py \ 
+    -tf result/5sample/cnc_highlighting.jsonl \
+    -pf cnc-pred.json
+    | tee result/5sample/R.cnc_H.cnc.result
+```
+The JSON file should be in the following format, take TARGET\_ID = "20221028\_10-K\_320193\_part2\_item7\_para1" as an example:
+```json
+{
+    "20221028_10-K_320193_part2_item7_para1": {
+        "id": TARGET_ID,
+        "words_probs_tgt_mean": [0.1, 0.2, 0.3, 0.4, 0.5],
+        "words_label_tgt_mean": [0, 0, 1, 1, 1],
+        "highlight_spans_smooth": [
+            "this is span 1",
+            "this is span 2"
+        ]
+    }
+    ...
+}
+```
+
 #### 3. Evaluate the retrieval result with IR metrics
 ```bash
 python3 task2_eval.py \ 

@@ -139,8 +139,8 @@ class Task1:
         for truth in iter_data:
             target_id = truth['id']
             highlight_result = predictions[target_id]
-            paragraph_list = highlight_result['references']
-            ref_ids = highlight_result['ref_ids']
+            paragraph_list = highlight_result.get('references', None)
+            ref_ids = highlight_result.get('ref_ids', None)
             # TODO: threshold setting duplicated, need to one of them --> fix threshold = 0.5
             # TODO: need to unify naming of keys
             metric_tmp = evaluate_a_pair_highlight(highlight_result, truth)
