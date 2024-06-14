@@ -18,6 +18,8 @@ if __name__ == '__main__':
     # file arguments
     parser.add_argument('--truth_file', '-tf', type=str, help='the truth file')
     parser.add_argument('--retrieve_result_file', '-rf', type=str, help='the retrieve result file')
+    parser.add_argument('--pred_file', '-pf', type=str, help='the pre-grenated prediction')
+    parser.add_argument('--generate_pred', '-gp', help='generate prediction filename or True, which will set pred.jsonl as filename', default=False)
     
     # highlighter arguments
     parser.add_argument('--highlighter', '-hl', type=str, default='attn', help='the highlighter to use')
@@ -38,15 +40,20 @@ if __name__ == '__main__':
     elif args.highlighter == 'cnc':
         highlighter = CncBertHighlighter(device=args.device)
     else:
-        raise ValueError('highlighter not supported')
+        if args.pred_file:
+            print('use pre-generated prediction')
+        else:
+            raise ValueError('highlighter not supported')
 
     task1 = Task1(
         highlighter=highlighter,
         retrieve_result_file=args.retrieve_result_file,
         truth_file=args.truth_file,
+        pred_file=args.pred_file,
         label_threshold=args.label_threshold,
         get_top_k=args.get_top_k,
         device=args.device,
-        verbose=args.verbose
+        verbose=args.verbose,
+        generate_pred=args.generate_pred
     )
     task1.evaluate()

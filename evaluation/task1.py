@@ -2,32 +2,37 @@
 # 20220222_10-K_1090727_part2_item7_para100 Q0 20180221_10-K_1090727_part2_item7_para107 1 84.35596466064453 title-year2018_2022-filtered_out-cik1090727-year2022_2022-item7
 # output: evaluation metrics
 
+import json
 import argparse
 import numpy as np
 import pandas as pd
 from collections import defaultdict
 from pathlib import Path
-from utils.utils import retrieve_paragraph_from_docid, read_jsonl
+from utils.utils import retrieve_paragraph_from_docid, read_jsonl, read_json
 from .metrics import evaluate_a_pair_highlight, evaluate_spans_in_a_pair_highlight
 from pprint import pprint
 from tqdm.auto import tqdm
+from collections import OrderedDict
 
 class Task1:
     def __init__(
             self, 
             highlighter,
             retrieve_result_file, 
-            truth_file, 
+            truth_file,
+            pred_file=None,
             label_threshold=0.5, 
             get_top_k=0, 
             device='cpu', 
-            verbose=False
+            verbose=False,
+            generate_pred=False,
         ):
 
         if not truth_file:
             raise ValueError("truth_file is required")
         assert bool(get_top_k) != bool(label_threshold), "only one of get_top_k and label_threshold should be set"
 
+        
         self.highlighter = highlighter
         self.retrieve_result_file = retrieve_result_file
         self.truth_file = truth_file
@@ -35,6 +40,11 @@ class Task1:
         self.get_top_k = get_top_k
         self.device = device
         self.verbose = verbose
+        self.generate_pred = generate_pred
+        if type(generate_pred) is str:
+            self.generate_pred = Path(generate_pred)
+        elif generate_pred:
+            self.generate_pred = Path('pred.jsonl')
 
         # preprocess truth and retrieve result
         self.truths = read_jsonl(truth_file)
@@ -49,12 +59,18 @@ class Task1:
             self.retrieve_result = target_id_group
         else:
             self.retrieve_result = None
+        
+        if pred_file is not None:
+            self.pred_file = read_json(pred_file)
+        else:
+            self.pred_file = None
+
 
     def evaluate(self):
         # TODO: select_topk's spirit is duplicated with r-precision? 
     
         # collect all the predictions
-        predictions = dict()
+        predictions = OrderedDict()
         # TODO: use batch or parallel to speed up
 
         if not self.verbose:
@@ -74,21 +90,44 @@ class Task1:
                 row = self.retrieve_result[self.retrieve_result['target_id'] == target_id].iloc[0]
                 paragraph_list = [r for r in row['paragraph_list'] if r is not None]
                 docid_list = row['doc_id_list']
-            
-            highlight_result = self.highlighter.highlighting_outputs(
-                    target=target_text, 
-                    text_references=paragraph_list,
-                    select_topk=select_topk,
-                    mean_aggregate=True,
-                    label_threshold=self.label_threshold,
-                    generate_spans=True
-            )
 
-            # add id info
-            highlight_result['id'] = target_id
-            predictions[target_id] = highlight_result
-            predictions[target_id]['references'] = paragraph_list
-            predictions[target_id]['ref_ids'] = docid_list
+            if self.pred_file is None:
+                highlight_result = OrderedDict({"id": target_id})
+                _highlight_result = self.highlighter.highlighting_outputs(
+                        target=target_text, 
+                        text_references=paragraph_list, # can be None
+                        select_topk=select_topk, 
+                        mean_aggregate=True,
+                        label_threshold=self.label_threshold,
+                        generate_spans=True
+                )
+
+                # add id info
+                highlight_result.update(_highlight_result)
+                predictions[target_id] = highlight_result
+                predictions[target_id]['references'] = paragraph_list
+                predictions[target_id]['ref_ids'] = docid_list
+
+            else:
+                try:
+                    highlight_result = self.pred_file[target_id]
+                except KeyError:
+                    print(f"no prediction for {target_id}")
+                    continue
+                predictions[target_id] = highlight_result
+
+        if self.generate_pred:
+            prediction_output = OrderedDict()
+            # clean the format
+            for target_id, highlight_result in predictions.items():
+                for k, v in highlight_result.items():
+                    if type(v) is np.ndarray:
+                        highlight_result[k] = v.tolist()
+                prediction_output[target_id] = highlight_result
+
+            with open(self.generate_pred, 'w') as f:
+                json.dump(prediction_output, f, indent=4)
+
 
         if not self.verbose:
             print("[Start evaluating...]")

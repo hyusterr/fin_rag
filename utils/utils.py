@@ -6,6 +6,11 @@ import fnmatch
 import re
 from .config import ROOT, RAW_DIR, FORMMATED_DIR, INDEX_DIR
 
+def read_json(file_path):
+    with open(file_path, "r") as open_file:
+        data = json.load(open_file)
+    return data
+
 def read_jsonl(file_path):
     data = []
     with open(file_path, "r") as open_file:

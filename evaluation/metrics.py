@@ -214,9 +214,6 @@ def evaluate_spans_in_a_pair_highlight(pred, truth):
     return output
 
 
-
-
-
 def evaluate_trec_qrels(preds, truths, K=10):
     """
     preds: filename of trec run format: target_id' 'Q0' 'doc_id' 'rank' 'score' 'run_id
