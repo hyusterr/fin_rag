@@ -142,8 +142,23 @@ def aggregate_highlights(annotation_files, output_file, agreement_threshold=0.5)
     
     
     # calculate the average of highlight_probs
+    validation_stats = {
+        "token_agreement": [],
+        "type_agreement": [],
+    }
     for sample in output.values():
         # BUG: duplicate highlights under an annotator, leads to probs > 1
+
+        # check agreement
+        all_0_count = sum([1 for p in sample["highlight_probs"] if p == 0])
+        all_1_count = sum([1 for p in sample["highlight_probs"] if p == n_annotators])
+        all_agree_count = all_1_count + all_0_count
+        token_agreement = all_agree_count / len(sample["highlight_probs"])
+        validation_stats["token_agreement"].append(token_agreement)
+
+        type_agreement = len(set(sample["type"])) == 1
+        validation_stats["type_agreement"].append(type_agreement)
+
         sample["highlight_probs"] = [p/n_annotators for p in sample["highlight_probs"]]
         assert all([p <= 1 for p in sample["highlight_probs"]])
 
@@ -172,6 +187,11 @@ def aggregate_highlights(annotation_files, output_file, agreement_threshold=0.5)
     with open(output_file, "w") as f:
         for sample in output.values():
             f.write(json.dumps(sample) + "\n")
+
+    print("Agreement stats:")
+    print(f"Token agreement: {sum(validation_stats['token_agreement']) / len(validation_stats['token_agreement'])}")
+    print(f"Type agreement: {sum(validation_stats['type_agreement']) / len(validation_stats['type_agreement'])}")
+
 
 def aggregate_retrieval(annotation_files, output_file):
     annotations = [read_trec(file) for file in annotation_files]
