@@ -167,7 +167,6 @@ def main():
 
     epoch = args.epochs
 
-    std_of_doc = []
     for j in range(epoch):
         count = 0
         
@@ -185,10 +184,6 @@ def main():
             
             # Apply softmax to the similar scores
             softmax_scores = softmax(similar_scores[0])
-            std_dev = statistics.stdev(softmax_scores)
-            print(std_dev)
-            std_of_doc.append(std_dev)
-            
             probs = []
             
             for i in range(1, len(similar_texts)):
@@ -230,17 +225,6 @@ def main():
                 probabilities_label_1 = probabilities[..., 1]
                 
                 probs.append(probabilities_label_1)
-
-            # Move tensors to CPU and convert to NumPy arrays
-            numpy_arrays = [t.detach().cpu().numpy() for t in probs]
-
-            # Stack arrays to create a 2D array
-            stacked_array = np.vstack(numpy_arrays)
-
-            # Calculate the standard deviation along the columns
-            std_dev = np.std(stacked_array, axis=0)
-            mean_of_retrieved = statistics.mean(std_dev)
-            print(mean_of_retrieved)
             
             # Compute weighted sum of probabilities
             summation = probs[0] * softmax_scores[0]
@@ -269,9 +253,6 @@ def main():
     total_correlation = 0
     total_precision = 0
 
-    std_of_doc = []
-    std_of_retrieved = []
-
     for testing_element in testing_elements:
         # Embed the query text
         query_embedding = embed_single_text(testing_element[1], retriever, tokenizer, device)
@@ -283,9 +264,6 @@ def main():
         
         # Compute softmax scores
         softmax_scores = softmax(similar_scores[0])
-        std_dev = statistics.stdev(softmax_scores)
-        print(std_dev)
-        std_of_doc.append(std_dev)
         probs = []
 
         for i in range(1, len(similar_texts)):
@@ -314,18 +292,6 @@ def main():
             probabilities = F.softmax(logits_before_sep, dim=-1)
             probabilities_label_1 = probabilities[..., 1]
             probs.append(probabilities_label_1)
-
-        # Move tensors to CPU and convert to NumPy arrays
-        numpy_arrays = [t.detach().cpu().numpy() for t in probs]
-
-        # Stack arrays to create a 2D array
-        stacked_array = np.vstack(numpy_arrays)
-
-        # Calculate the standard deviation along the columns
-        std_dev = np.std(stacked_array, axis=0)
-        mean_of_retrieved = statistics.mean(std_dev)
-        print(mean_of_retrieved)
-        std_of_retrieved.append(mean_of_retrieved)
 
         # Compute weighted sum of probabilities
         summation = probs[0] * softmax_scores[0]
@@ -365,18 +331,6 @@ def main():
     print(total_correlation / num_of_good)
     print("Final Average Precision:")
     print(total_precision / len(testing_elements))
-
-    # Calculate mean using statistics.mean
-    mean_value = statistics.mean(std_of_doc)
-
-    # Print the mean
-    print("The mean of doc prob is:", mean_value)
-
-    # Calculate mean using statistics.mean
-    mean_value = statistics.mean(std_of_retrieved)
-
-    # Print the mean
-    print("The mean of retrieved std is:", mean_value)
 
 
 
