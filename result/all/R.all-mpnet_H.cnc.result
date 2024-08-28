@@ -1,0 +1,17 @@
+Paragraph not found. 20200302_10-K_1012100_finstats_para30
+Paragraph not found. 20200302_10-K_1012100_finstats_para30
+[Start highlighting...]
+[Start evaluating...]
+defaultdict(<class 'list'>,
+            {'auc': 0.5471856728655926,
+             'correlation': 0.05458036636900865,
+             'f1': 0.12015624053139722,
+             'precision': 0.4195465722030048,
+             'r_precision': 0.4038927614808435,
+             'recall': 0.07802695055682467,
+             'rouge1': 0.1377396704541449,
+             'rouge2': 0.07965662527848215,
+             'rougeL': 0.13572095903377024,
+             'rougeLsum': 0.13572095903377024,
+             'span_accuracy': 0.09620422378484732,
+             'span_exact_match': 0.0023249299719887953})

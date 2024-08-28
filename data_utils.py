@@ -6,7 +6,7 @@ from pprint import pprint
 from typing import List
 from collections import Counter
 
-from .utils import read_jsonl
+from utils.utils import read_jsonl
 
 
 def get_statistics(data_path: str):
@@ -61,10 +61,18 @@ def get_statistics(data_path: str):
         'mean': sum(length) / len(data),
         'median': pd.Series(length).median()
     }
-    # span length
 
+    # span length
+    span_length = [len(span.split()) for item in data for span in item['highlight_spans']]
+    statistics['span_length'] = {
+        'min': min(span_length),
+        'max': max(span_length),
+        'mean': sum(span_length) / len(span_length),
+        'median': pd.Series(span_length).median()
+    }
 
     # number of spans
+    num_span = [len(item['highlight_spans']) for item in data]
 
     # get the signal density statistics
     signal_density = [sum(item['highlight_probs']) / len(item['highlight_probs']) for item in data]
@@ -75,9 +83,8 @@ def get_statistics(data_path: str):
         'median': pd.Series(signal_density).median()
     }
 
-
-
     # return dictionary
+    return statistics
 
 
 def slice_data(
@@ -139,3 +146,10 @@ def read_slice_data(data_dir: str):
         split_data_path = data_dir / f'{split}.jsonl'
         data_splits[split] = read_jsonl(split_data_path)
     return data_splits
+
+
+if __name__ == '__main__':
+    data_path = 'annotation/annotated_result/all/aggregate_qlabels.jsonl'
+    statistics = get_statistics(data_path)
+    pprint(statistics)
+

@@ -1,0 +1,15 @@
+[Start highlighting...]
+[Start evaluating...]
+defaultdict(<class 'list'>,
+            {'auc': 0.561687716805282,
+             'correlation': 0.07433954983584265,
+             'f1': 0.14211399043595443,
+             'precision': 0.4374177696460159,
+             'r_precision': 0.4139277615374698,
+             'recall': 0.09671007854542713,
+             'rouge1': 0.16341339410238664,
+             'rouge2': 0.09584445227620263,
+             'rougeL': 0.16018930960986555,
+             'rougeLsum': 0.16018930960986555,
+             'span_accuracy': 0.11837770163681047,
+             'span_exact_match': 0.004677871148459384})

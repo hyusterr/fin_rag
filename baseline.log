@@ -1,0 +1,72 @@
+Retriever: all-mpnet + Highlighter: cnc
+Paragraph not found. 20200302_10-K_1012100_finstats_para30
+Paragraph not found. 20200302_10-K_1012100_finstats_para30
+[Start highlighting...]
+[Start evaluating...]
+defaultdict(<class 'list'>,
+            {'auc': 0.5471856728655926,
+             'correlation': 0.05458036636900865,
+             'f1': 0.12015624053139722,
+             'precision': 0.4195465722030048,
+             'r_precision': 0.4038927614808435,
+             'recall': 0.07802695055682467,
+             'rouge1': 0.1377396704541449,
+             'rouge2': 0.07965662527848215,
+             'rougeL': 0.13572095903377024,
+             'rougeLsum': 0.13572095903377024,
+             'span_accuracy': 0.09620422378484732,
+             'span_exact_match': 0.0023249299719887953})
+Retriever: dpr + Highlighter: cnc
+[Start highlighting...]
+[Start evaluating...]
+defaultdict(<class 'list'>,
+            {'auc': 0.561687716805282,
+             'correlation': 0.07433954983584265,
+             'f1': 0.14211399043595443,
+             'precision': 0.4374177696460159,
+             'r_precision': 0.4139277615374698,
+             'recall': 0.09671007854542713,
+             'rouge1': 0.16341339410238664,
+             'rouge2': 0.09584445227620263,
+             'rougeL': 0.16018930960986555,
+             'rougeLsum': 0.16018930960986555,
+             'span_accuracy': 0.11837770163681047,
+             'span_exact_match': 0.004677871148459384})
+Retriever: hybrid + Highlighter: cnc
+Paragraph not found. 20200302_10-K_1012100_finstats_para30
+Paragraph not found. 20200302_10-K_1012100_finstats_para30
+[Start highlighting...]
+[Start evaluating...]
+defaultdict(<class 'list'>,
+            {'auc': 0.5468911763296364,
+             'correlation': 0.0490898594384042,
+             'f1': 0.13425640062037436,
+             'precision': 0.42090292047983574,
+             'r_precision': 0.40187762884498945,
+             'recall': 0.09008906406100288,
+             'rouge1': 0.14968797550686377,
+             'rouge2': 0.0887917373984856,
+             'rougeL': 0.14737964922811703,
+             'rougeLsum': 0.14737964922811703,
+             'span_accuracy': 0.1100313517703003,
+             'span_exact_match': 0.004803921568627451})
+Retriever: multi_fields + Highlighter: cnc
+Paragraph not found. 20200302_10-K_1012100_finstats_para30
+Paragraph not found. 20200302_10-K_1012100_finstats_para30
+Paragraph not found. 20200302_10-K_1012100_finstats_para30
+Paragraph not found. 20200302_10-K_1012100_finstats_para30
+[Start highlighting...]
+[Start evaluating...]
+defaultdict(<class 'list'>,
+            {'auc': 0.5467922561578282,
+             'correlation': 0.04937821917230707,
+             'f1': 0.13675293142745742,
+             'precision': 0.42090632965155683,
+             'r_precision': 0.4023904619142364,
+             'recall': 0.09268102829428017,
+             'rouge1': 0.15172518123034684,
+             'rouge2': 0.09117382334315645,
+             'rougeL': 0.14938354475923368,
+             'rougeLsum': 0.14938354475923368,
+             'span_accuracy': 0.11323826879695366,
+             'span_exact_match': 0.004803921568627451})

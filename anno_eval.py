@@ -1,38 +1,64 @@
 # evaluate the annotation quality of the dataset
+import string
 from annotation.aggregate_annotation import read_jsonl, TOPIC_MAP, SUBTOPIC_MAP, TYPE_MAP
 import argparse
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 import pandas as pd
 import numpy as np
 from statsmodels.stats.inter_rater import fleiss_kappa, aggregate_raters
+
+def exact_span_agreement(span1, span2):
+    return span1 == span2
+
+def overlap_span_agreement(span1, span2):
+    # TODO: check if this is correct
+    # I guess should use token id instead of token itself
+    return len(set(span1) & set(span2)) > 0
+
+def one_bound_span_agreement(span1, span2):
+    # TODO: check if this is correct
+    '''
+    '''
+    pass
+
 
 def preprocess_sample(sample):
     sample_id = sample['id']
     text = sample['text']
     tokens = text.split()
+    normalized_tokens = [t.translate(str.maketrans('', '', string.punctuation)).lower() for t in tokens]    
     binary_labels = [0] * len(tokens)
     signal_type = [k for k, v in sample['type'].items() if v == 1]
     topic = [k for k, v in sample['topic'].items() if v != 0]
     sub_topic = [f'{k}-{v}' for k, v in sample['topic'].items() if v not in [0, 1]]
     if len(sample['highlight']) != 0:
-        highlight_spans = sample['highlight'].split(' ||| ')
+        highlight_spans = sample['highlight'].split('|||')
         span_tokens = [s.strip().split() for s in highlight_spans] # list of list of tokens
         span_tokens = [s for s in span_tokens if len(s) > 0] # filter out empty spans
-        
+        normalized_span_tokens = [[t.translate(str.maketrans('', '', string.punctuation)).lower() for t in s] for s in span_tokens] # span tokens without punctuation
+        # print(normalized_span_tokens)
+        # print(span_tokens)
+
         span_already_checked = 0
         i = 0
         while i < len(tokens):
             if span_already_checked == len(span_tokens):
                 break
 
-            if tokens[i] == span_tokens[span_already_checked][0]:
-                if tokens[i:i+len(span_tokens[span_already_checked])] == span_tokens[span_already_checked]:
-                    for j in range(i, i+len(span_tokens[span_already_checked])):
+            if normalized_tokens[i] == normalized_span_tokens[span_already_checked][0]:
+                for j in range(i, i+len(span_tokens[span_already_checked])):
+                    '''
+                    print(j, i, j-i)
+                    print(len(normalized_tokens), len(tokens))
+                    print(len(normalized_span_tokens[span_already_checked]))
+                    '''
+                    # WTF is happening here?
+                    if j - i >= len(normalized_span_tokens[span_already_checked]) or j >= len(normalized_tokens):
+                        break
+                    if normalized_tokens[j] == normalized_span_tokens[span_already_checked][j-i]:
                         binary_labels[j] = 1
-                    i += len(span_tokens[span_already_checked])
-                    span_already_checked += 1
-                else:
-                    i += 1
+                i += len(span_tokens[span_already_checked])
+                span_already_checked += 1
             else:
                 i += 1
     
@@ -44,6 +70,7 @@ def preprocess_sample(sample):
             'signal_type': signal_type,
             'topic': topic,
             'sub_topic': sub_topic
+            'normalized_span_tokens': normalized_span_tokens
         }
     }
 
@@ -52,7 +79,7 @@ def preprocess_annotations(annotation_files):
     annotators = [f.split('/')[-1].split('.')[0].split('_')[0] for f in annotation_files]
     sample_size = len(annotations[0])
 
-    annotator_annotations = {a: dict() for a in annotators}
+    annotator_annotations = OrderedDict({a: OrderedDict() for a in annotators})
     sample_id_set = set()
     for annotator, annotation in zip(annotators, annotations):
         for sample in annotation:
@@ -65,6 +92,7 @@ def preprocess_annotations(annotation_files):
 
 def evaluate_annotation(annotation_files):
     annotator_annotations, sample_id_set = preprocess_annotations(annotation_files)
+    annotators = list(annotator_annotations.keys())
 
     # check for bugs
     for annotator, annotation in annotator_annotations.items():
@@ -114,6 +142,7 @@ def evaluate_annotation(annotation_files):
     sample_id_list = list(sample_id_set)
     n_samples = len(sample_id_list)
     inter_annotator_metrics = defaultdict(list)
+    agreement_2_sids = []
     # check for agreement
     # inter-annotator agreement, loop over samples
     for id_ in sample_id_list:
@@ -121,6 +150,7 @@ def evaluate_annotation(annotation_files):
         # for s in sample_from_annotators:
         #     print(s)
         
+        # token-level agreement
         # strict agreement: all annotators agree on the same label
         strict_agreement_on_tokens = 0
         no_agreement_on_tokens = 0 
@@ -149,24 +179,40 @@ def evaluate_annotation(annotation_files):
             inter_annotator_metrics['strict_agreement_on_types'].append(0)
             inter_annotator_metrics['2_agreement_on_types'].append(0)
         else:
+            agreement_2_sids.append(id_)
             inter_annotator_metrics['2_agreement_on_types'].append(1)
             inter_annotator_metrics['strict_agreement_on_types'].append(0)
             inter_annotator_metrics['no_agreement_on_types'].append(0)
+            print(f'[2 AGREEMENT] {id_}')
+            print(sample_from_annotators[0]['binary_labels'], sample_from_annotators[0]['SIGNAL'], annotators[0], sep='\t')
+            print(sample_from_annotators[1]['binary_labels'], sample_from_annotators[1]['SIGNAL'], annotators[1], sep='\t')
+            print(sample_from_annotators[2]['binary_labels'], sample_from_annotators[2]['SIGNAL'], annotators[2], sep='\t')
 
-        df_kappa = pd.DataFrame([s['binary_labels'] for s in sample_from_annotators]).T
-        arr, categories = aggregate_raters(df_kappa)
-        kappa = fleiss_kappa(arr, method='fleiss')
-        if np.isnan(kappa):
-            print(f'kappa is nan for {id_}')
-            print([s['binary_labels'] for s in sample_from_annotators])
-        inter_annotator_metrics['fleiss_kappa'].append(kappa)
+    # concat all token labels from each annotator, seperate by annotator
+    df_all_tokens = pd.DataFrame({a: np.concatenate([annotator_annotations[a][sid]['binary_labels'] for sid in sample_id_list]) for a in annotator_annotations.keys()})
+    print(df_all_tokens.shape)
+    df_all_tokens.to_csv('all_tokens.csv')
+    arr, categories = aggregate_raters(df_all_tokens)
+    print(arr.shape)
+    print(categories)
+    kappa = fleiss_kappa(arr, method='fleiss')
+    inter_annotator_metrics['fleiss_kappa_all_tokens'].append(kappa)
+    
+    '''
+    df_all_types = pd.DataFrame({a: [annotator_annotations[a][sid]['SIGNAL'] for sid in sample_id_list] for a in annotator_annotations.keys()})
+    arr, categories = aggregate_raters(df_all_types)
+    kappa = fleiss_kappa(arr, method='fleiss')
+    inter_annotator_metrics['fleiss_kappa_all_types'].append(kappa)
+    
+    
+    df_2_agreement_tokens = pd.DataFrame({a: np.concatenate([annotator_annotations[a][sid]['binary_labels'] for sid in agreement_2_sids]) for a in annotator_annotations.keys()})
+    arr, categories = aggregate_raters(df_2_agreement_tokens)
+    kappa = fleiss_kappa(arr, method='fleiss')
+    inter_annotator_metrics['fleiss_kappa_2_agreement_tokens'].append(kappa)
+    '''
 
     for metric, values in inter_annotator_metrics.items():
-        print(f'{metric}: {np.nanmean(values)}')
-    
-
-            
-        
+        print(f'{metric}: {np.nanmean(values)}') 
 
 
     # soft agreement, see: https://en.innovatiana.com/post/inter-annotator-agreement
