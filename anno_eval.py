@@ -1,25 +1,14 @@
 # evaluate the annotation quality of the dataset
 import string
+from typing import List
 from annotation.aggregate_annotation import read_jsonl, TOPIC_MAP, SUBTOPIC_MAP, TYPE_MAP
 import argparse
 from collections import defaultdict, OrderedDict
+from itertools import combinations, permutations, product
 import pandas as pd
 import numpy as np
 from statsmodels.stats.inter_rater import fleiss_kappa, aggregate_raters
 
-def exact_span_agreement(span1, span2):
-    return span1 == span2
-
-def overlap_span_agreement(span1, span2):
-    # TODO: check if this is correct
-    # I guess should use token id instead of token itself
-    return len(set(span1) & set(span2)) > 0
-
-def one_bound_span_agreement(span1, span2):
-    # TODO: check if this is correct
-    '''
-    '''
-    pass
 
 
 def preprocess_sample(sample):
@@ -31,6 +20,8 @@ def preprocess_sample(sample):
     signal_type = [k for k, v in sample['type'].items() if v == 1]
     topic = [k for k, v in sample['topic'].items() if v != 0]
     sub_topic = [f'{k}-{v}' for k, v in sample['topic'].items() if v not in [0, 1]]
+    span_ids = []
+
     if len(sample['highlight']) != 0:
         highlight_spans = sample['highlight'].split('|||')
         span_tokens = [s.strip().split() for s in highlight_spans] # list of list of tokens
@@ -61,6 +52,16 @@ def preprocess_sample(sample):
                 span_already_checked += 1
             else:
                 i += 1
+
+        span_tmp = []
+        for index, label in enumerate(binary_labels):
+            if label == 1:
+                span_tmp.append(index)
+            elif len(span_tmp) != 0:
+                span_ids.append(span_tmp)
+                span_tmp = []
+
+    
     
     return {
         sample_id: {
@@ -69,8 +70,8 @@ def preprocess_sample(sample):
             'binary_labels': binary_labels,
             'signal_type': signal_type,
             'topic': topic,
-            'sub_topic': sub_topic
-            'normalized_span_tokens': normalized_span_tokens
+            'sub_topic': sub_topic,
+            'span_ids': span_ids
         }
     }
 
@@ -88,6 +89,19 @@ def preprocess_annotations(annotation_files):
             sample_id_set.update(preprocessed_sample.keys())
 
     return annotator_annotations, sample_id_set
+
+# use id to prevent token are accidentally matched
+def exact_span_agreement(span1: List[int], span2: List[int]):
+    return int(span1 == span2)
+
+def overlap_span_agreement(span1: List[int], span2: List[int]):
+    # TODO: check if this is correct
+    # I guess should use token id instead of token itself
+    return int(len(set(span1) & set(span2)) > 0)
+
+def one_bound_span_agreement(span1: List[int], span2: List[int]):
+    # TODO: check if this is correct
+    return int(span1[0] == span2[0] or span1[-1] == span2[-1])
 
 
 def evaluate_annotation(annotation_files):
@@ -149,7 +163,6 @@ def evaluate_annotation(annotation_files):
         sample_from_annotators = [annotator_annotations[a][id_] for a in annotator_annotations.keys()]
         # for s in sample_from_annotators:
         #     print(s)
-        
         # token-level agreement
         # strict agreement: all annotators agree on the same label
         strict_agreement_on_tokens = 0
@@ -167,6 +180,26 @@ def evaluate_annotation(annotation_files):
         no_agreement_on_tokens /= len_tokens
         inter_annotator_metrics['strict_agreement_on_tokens'].append(strict_agreement_on_tokens)
         inter_annotator_metrics['no_agreement_on_tokens'].append(no_agreement_on_tokens)
+
+        # span-level agreement
+        annotator_pairs = list(permutations(range(len(annotators)), 2))
+        for a1, a2 in annotator_pairs:
+            # List of List[int]
+            span1_ids = sample_from_annotators[a1]['span_ids']
+            span2_ids = sample_from_annotators[a2]['span_ids']
+            if len(span1_ids) == 0 or len(span2_ids) == 0:
+                # NOTE: this will only count the number of samples that have highlights
+                continue
+
+            for span1, span2 in product(span1_ids, span2_ids):
+                exact_agreement = exact_span_agreement(span1, span2)
+                overlap_agreement = overlap_span_agreement(span1, span2)
+                one_bound_agreement = one_bound_span_agreement(span1, span2)
+
+                inter_annotator_metrics['span_exact_agreement'].append(exact_agreement)
+                inter_annotator_metrics['span_one_bound_agreement'].append(one_bound_agreement)
+                inter_annotator_metrics['span_overlap_agreement'].append(overlap_agreement)
+        
 
         # iterate over sample
         types = [s['SIGNAL'] for s in sample_from_annotators]
