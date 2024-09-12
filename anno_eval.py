@@ -3,7 +3,7 @@ import string
 from typing import List
 from annotation.aggregate_annotation import read_jsonl, TOPIC_MAP, SUBTOPIC_MAP, TYPE_MAP
 import argparse
-from collections import defaultdict, OrderedDict
+from collections import defaultdict, OrderedDict, Counter
 from itertools import combinations, permutations, product
 import pandas as pd
 import numpy as np
@@ -97,11 +97,65 @@ def exact_span_agreement(span1: List[int], span2: List[int]):
 def overlap_span_agreement(span1: List[int], span2: List[int]):
     # TODO: check if this is correct
     # I guess should use token id instead of token itself
-    return int(len(set(span1) & set(span2)) > 0)
+    return int(len(set(span1) & set(span2)) > 0), len(set(span1) & set(span2))
 
 def one_bound_span_agreement(span1: List[int], span2: List[int]):
     # TODO: check if this is correct
     return int(span1[0] == span2[0] or span1[-1] == span2[-1])
+
+# [2024-09-13] TODO: check the logic again
+def evaluate_span_agreement(span1: List[List[int]], span2: List[List[int]]):
+    '''
+    input: span1, span2: List[List[int]]
+    direct comparison between all spans in span1 with all spans in span2
+    '''
+    result = []
+    for s1 in span1:
+        has_overlap = False  # local for this span
+        overlaped_spans = [] # there might be multiple spans that overlap with s1, we need to get the one with the highest overlap? highest TO+OB+EM? 
+        overlap_len_list = []
+        overlap_ratio_list = []
+        ob_list, em_list = [], []
+        for s2 in span2:
+            overlap, overlap_len = overlap_span_agreement(s1, s2)
+            if overlap: 
+                has_overlap = True
+                overlaped_span.append(s2)
+                overlap_len_list.append(overlap_len)
+                overlap_ratio_list.append(overlap_len / len(s1))
+
+
+        if has_overlap: # collect binary label, one span can only have true or false on span-level agreement
+            for s2 in overlaped_span:
+                one_bound_overlap = one_bound_span_agreement(s1, s2)
+                exact_overlap = exact_span_agreement(s1, s2)
+                ob_list.append(one_bound_overlap)
+                em_list.append(exact_overlap)
+            # get the best result as the final result
+            token_overlap = 1
+            exact_overlap = max(em_list) # 1 or 0
+            one_bound_overlap = max(ob_list) # 1 or 0
+            best_overlap_len = max(overlap_len_list)
+            best_overlap_ratio = max(overlap_ratio_list)
+            total_overlap_len = sum(overlap_len_list)
+            total_overlap_ratio = sum(overlap_ratio_list)
+        else:
+            token_overlap, exact_overlap, one_bound_overlap = 0, 0, 0
+            best_overlap_len, best_overlap_ratio = 0, 0
+            total_overlap_len, total_overlap_ratio = 0, 0
+
+        # collect ouput as dict, append to result
+        result.append({
+            'token_overlap': token_overlap,
+            'exact_overlap': exact_overlap,
+            'one_bound_overlap': one_bound_overlap,
+            'best_overlap_len': best_overlap_len,
+            'best_overlap_ratio': best_overlap_ratio,
+            'total_overlap_len': total_overlap_len,
+            'total_overlap_ratio': total_overlap_ratio
+        })
+    
+    return result
 
 
 def evaluate_annotation(annotation_files):
@@ -182,7 +236,7 @@ def evaluate_annotation(annotation_files):
         inter_annotator_metrics['no_agreement_on_tokens'].append(no_agreement_on_tokens)
 
         # span-level agreement
-        annotator_pairs = list(permutations(range(len(annotators)), 2))
+        annotator_pairs = list(combinations(range(len(annotators)), 2))
         for a1, a2 in annotator_pairs:
             # List of List[int]
             span1_ids = sample_from_annotators[a1]['span_ids']
@@ -192,9 +246,7 @@ def evaluate_annotation(annotation_files):
                 continue
 
             for span1, span2 in product(span1_ids, span2_ids):
-                exact_agreement = exact_span_agreement(span1, span2)
-                overlap_agreement = overlap_span_agreement(span1, span2)
-                one_bound_agreement = one_bound_span_agreement(span1, span2)
+                # TODO: fix this to the new version
 
                 inter_annotator_metrics['span_exact_agreement'].append(exact_agreement)
                 inter_annotator_metrics['span_one_bound_agreement'].append(one_bound_agreement)
@@ -207,6 +259,9 @@ def evaluate_annotation(annotation_files):
             inter_annotator_metrics['strict_agreement_on_types'].append(1)
             inter_annotator_metrics['no_agreement_on_types'].append(0)
             inter_annotator_metrics['2_agreement_on_types'].append(0)
+            inter_annotator_metrics['all_agreement_on_types_span_exact_agreement'].append(exact_agreement)
+            inter_annotator_metrics['all_agreement_on_types_span_one_bound_agreement'].append(one_bound_agreement)
+            inter_annotator_metrics['all_agreement_on_types_span_overlap_agreement'].append(overlap_agreement)
         elif len(set(types)) == len(types):
             inter_annotator_metrics['no_agreement_on_types'].append(1)
             inter_annotator_metrics['strict_agreement_on_types'].append(0)
@@ -216,6 +271,21 @@ def evaluate_annotation(annotation_files):
             inter_annotator_metrics['2_agreement_on_types'].append(1)
             inter_annotator_metrics['strict_agreement_on_types'].append(0)
             inter_annotator_metrics['no_agreement_on_types'].append(0)
+
+            counter_types = Counter(types)
+            agreed_2_type = [k for k, v in counter_types.items() if v == 2][0]
+            agreed_2_annotators = [i for i, t in enumerate(types) if t == agreed_2_type]
+            span_ids1 = sample_from_annotators[agreed_2_annotators[0]]['span_ids']
+            span_ids2 = sample_from_annotators[agreed_2_annotators[1]]['span_ids']
+            for span1, span2 in product(span_ids1, span_ids2):
+                exact_agreement = exact_span_agreement(span1, span2)
+                overlap_agreement = overlap_span_agreement(span1, span2)
+                one_bound_agreement = one_bound_span_agreement(span1, span2)
+                inter_annotator_metrics['2_agreement_on_types_span_exact_agreement'].append(exact_agreement)
+                inter_annotator_metrics['2_agreement_on_types_span_one_bound_agreement'].append(one_bound_agreement)
+                inter_annotator_metrics['2_agreement_on_types_span_overlap_agreement'].append(overlap_agreement)
+
+
             print(f'[2 AGREEMENT] {id_}')
             print(sample_from_annotators[0]['binary_labels'], sample_from_annotators[0]['SIGNAL'], annotators[0], sep='\t')
             print(sample_from_annotators[1]['binary_labels'], sample_from_annotators[1]['SIGNAL'], annotators[1], sep='\t')
