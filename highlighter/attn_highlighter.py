@@ -3,6 +3,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn import CrossEntropyLoss
 import numpy as np
 import transformers
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline, AutoModelForSeq2SeqLM
@@ -228,6 +229,20 @@ class AttnHighlighter(BaseHighlighter):
         return outputs
 
 
+    def forward(
+        self,
+        target,
+        highlight_spans=None,
+        label=None,
+    ):
+        
+        if self.method == 'text-classification':
+            upstream_output = self.model(target, labels=label)
 
+        elif self.method == 'summarization':
+            upstream_output = self.model(target, labels=label)
+
+        loss = upstream_output.loss
+        return loss
 
 

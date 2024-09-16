@@ -3,47 +3,36 @@ import string
 import argparse
 from tqdm.auto import tqdm
 from collections import OrderedDict
+import numpy as np
+from pprint import pprint
 
-TOPIC_MAP = {
-        "1": "Overview",
-        "2": "Industry",
-        "3": "Risk",
-        "4": "Legal",
-        "5": "Financial Status",
-        "6": "Strategy",
-        "7": "Operation",
-        "0": "Others",
-}
+from .utils import read_jsonl, read_trec, preprocess_annotations
+from .utils import TYPE_MAP, TOPIC_MAP, SUBTOPIC_MAP
 
-SUBTOPIC_MAP = {
-        "3-2": "Government",
-        "7-2": "Capital",
-        "7-3": "Accounting",
-}
+# [2024-09-17] TODO: figure out how to use relative import...
+def aggregate_highlights_complex(annotation_files, output_file):
+    # tentative aggregate settings:
+    # 1. based on agreement level of types:
+    #     a. all agree on type --> use it as label
+    #     b. some agree on type --> P(token|type); something like empirical bayes sum of probabilities?
+    # 2. based on agreement level of tokens: what if we only use the tokens that have high agreement level?
+    #     a. pick the highest agreed tokens (on 0 or 1) as "signal/non-signal center", which are an atomic-level annotation, and then expand the centers
+    annotator_annotations, sample_id_set = preprocess_annotations(annotation_files)
+    for sample_id in sample_id_set:
+        samples = [a[sample_id] for a in annotator_annotations] # list of dict
+        voting_label = np.mean([s['binary_labels'] for s in samples])
+        pprint(voting_label)
+        pprint(samples)
 
-TYPE_MAP = {
-        "0": "trivial",
-        "1": "company-specific",
-        "2": "change/action",
-        "3": "reason",
-        "4": "redirect",
-}
 
-def read_jsonl(file):
-    '''
-    file: file to read
-    '''
-    with open(file, "r") as f:
-        return [json.loads(line) for line in f]
+        break
 
-def read_trec(file):
-    '''
-    file: file to read
-    '''
-    with open(file, "r") as f:
-        return [line.strip().split() for line in f]
 
-def aggregate_highlights(annotation_files, output_file, agreement_threshold=0.5):
+
+   
+
+
+def aggregate_highlights_naive(annotation_files, output_file, agreement_threshold=0.5):
     '''
     annotation_files: list of annotation files
     - FORMAT (of a line): {
@@ -223,7 +212,11 @@ if __name__ == "__main__":
     parser.add_argument("--task", "-t", help="Task to aggregate", choices=["highlight", "retrieval"], default="highlight")
     args = parser.parse_args()
 
+    aggregate_highlights_complex(args.annotation_files, args.output_file)
+    
+    '''
     if args.task == "retrieval":
         aggregate_retrieval(args.annotation_files, args.output_file)
     elif args.task == "highlight":
         aggregate_highlights(args.annotation_files, args.output_file, args.agreement_threshold)
+    '''
