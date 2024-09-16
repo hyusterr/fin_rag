@@ -120,13 +120,13 @@ def evaluate_span_agreement(span1: List[List[int]], span2: List[List[int]]):
             overlap, overlap_len = overlap_span_agreement(s1, s2)
             if overlap: 
                 has_overlap = True
-                overlaped_span.append(s2)
+                overlaped_spans.append(s2)
                 overlap_len_list.append(overlap_len)
                 overlap_ratio_list.append(overlap_len / len(s1))
 
 
         if has_overlap: # collect binary label, one span can only have true or false on span-level agreement
-            for s2 in overlaped_span:
+            for s2 in overlaped_spans:
                 one_bound_overlap = one_bound_span_agreement(s1, s2)
                 exact_overlap = exact_span_agreement(s1, s2)
                 ob_list.append(one_bound_overlap)
@@ -145,6 +145,7 @@ def evaluate_span_agreement(span1: List[List[int]], span2: List[List[int]]):
             total_overlap_len, total_overlap_ratio = 0, 0
 
         # collect ouput as dict, append to result
+        # one span has one result
         result.append({
             'token_overlap': token_overlap,
             'exact_overlap': exact_overlap,
@@ -155,7 +156,7 @@ def evaluate_span_agreement(span1: List[List[int]], span2: List[List[int]]):
             'total_overlap_ratio': total_overlap_ratio
         })
     
-    return result
+    return result # list of dict
 
 
 def evaluate_annotation(annotation_files):
@@ -210,6 +211,9 @@ def evaluate_annotation(annotation_files):
     sample_id_list = list(sample_id_set)
     n_samples = len(sample_id_list)
     inter_annotator_metrics = defaultdict(list)
+    inter_annotator_metrics['strict_agreement_on_types_span_measure'] = defaultdict(list)
+    inter_annotator_metrics['no_agreement_on_types_span_measure'] = defaultdict(list)
+    inter_annotator_metrics['2_agreement_on_types_span_measure'] = defaultdict(list)
     agreement_2_sids = []
     # check for agreement
     # inter-annotator agreement, loop over samples
@@ -237,6 +241,7 @@ def evaluate_annotation(annotation_files):
 
         # span-level agreement
         annotator_pairs = list(combinations(range(len(annotators)), 2))
+        span_level_agreement = []
         for a1, a2 in annotator_pairs:
             # List of List[int]
             span1_ids = sample_from_annotators[a1]['span_ids']
@@ -245,12 +250,15 @@ def evaluate_annotation(annotation_files):
                 # NOTE: this will only count the number of samples that have highlights
                 continue
 
-            for span1, span2 in product(span1_ids, span2_ids):
-                # TODO: fix this to the new version
+            else:
+                span_a1_agreements = evaluate_span_agreement(span1_ids, span2_ids)
+                span_a2_agreements = evaluate_span_agreement(span2_ids, span1_ids)
+                # the annotation-level: one annotator-span has one result
+                for res in span_a1_agreements + span_a2_agreements:
+                    for key, value in res.items():
+                        inter_annotator_metrics[key].append(value)
 
-                inter_annotator_metrics['span_exact_agreement'].append(exact_agreement)
-                inter_annotator_metrics['span_one_bound_agreement'].append(one_bound_agreement)
-                inter_annotator_metrics['span_overlap_agreement'].append(overlap_agreement)
+                span_level_agreement += span_a1_agreements + span_a2_agreements
         
 
         # iterate over sample
@@ -259,19 +267,27 @@ def evaluate_annotation(annotation_files):
             inter_annotator_metrics['strict_agreement_on_types'].append(1)
             inter_annotator_metrics['no_agreement_on_types'].append(0)
             inter_annotator_metrics['2_agreement_on_types'].append(0)
-            inter_annotator_metrics['all_agreement_on_types_span_exact_agreement'].append(exact_agreement)
-            inter_annotator_metrics['all_agreement_on_types_span_one_bound_agreement'].append(one_bound_agreement)
-            inter_annotator_metrics['all_agreement_on_types_span_overlap_agreement'].append(overlap_agreement)
+            for span_res in span_level_agreement:
+                for key, value in span_res.items():
+                    inter_annotator_metrics['strict_agreement_on_types_span_measure'][key].append(value)
         elif len(set(types)) == len(types):
             inter_annotator_metrics['no_agreement_on_types'].append(1)
             inter_annotator_metrics['strict_agreement_on_types'].append(0)
             inter_annotator_metrics['2_agreement_on_types'].append(0)
+            for span_res in span_level_agreement:
+                for key, value in span_res.items():
+                    inter_annotator_metrics['no_agreement_on_types_span_measure'][key].append(value)
         else:
             agreement_2_sids.append(id_)
             inter_annotator_metrics['2_agreement_on_types'].append(1)
             inter_annotator_metrics['strict_agreement_on_types'].append(0)
             inter_annotator_metrics['no_agreement_on_types'].append(0)
+            for span_res in span_level_agreement:
+                for key, value in span_res.items():
+                    inter_annotator_metrics['2_agreement_on_types_span_measure'][key].append(value)
 
+
+            '''
             counter_types = Counter(types)
             agreed_2_type = [k for k, v in counter_types.items() if v == 2][0]
             agreed_2_annotators = [i for i, t in enumerate(types) if t == agreed_2_type]
@@ -290,6 +306,7 @@ def evaluate_annotation(annotation_files):
             print(sample_from_annotators[0]['binary_labels'], sample_from_annotators[0]['SIGNAL'], annotators[0], sep='\t')
             print(sample_from_annotators[1]['binary_labels'], sample_from_annotators[1]['SIGNAL'], annotators[1], sep='\t')
             print(sample_from_annotators[2]['binary_labels'], sample_from_annotators[2]['SIGNAL'], annotators[2], sep='\t')
+            '''
 
     # concat all token labels from each annotator, seperate by annotator
     df_all_tokens = pd.DataFrame({a: np.concatenate([annotator_annotations[a][sid]['binary_labels'] for sid in sample_id_list]) for a in annotator_annotations.keys()})
@@ -314,8 +331,14 @@ def evaluate_annotation(annotation_files):
     inter_annotator_metrics['fleiss_kappa_2_agreement_tokens'].append(kappa)
     '''
 
+    # [2024-09-17] TODO: there must be a bug in the code since the output is wired
+    print(inter_annotator_metrics.keys())
     for metric, values in inter_annotator_metrics.items():
-        print(f'{metric}: {np.nanmean(values)}') 
+        if type(values) is defaultdict:
+            for k, v in values.items():
+                print(f'{metric}_{k}: {np.nanmean(v)}')
+        else:
+            print(f'{metric}: {np.nanmean(values)}') 
 
 
     # soft agreement, see: https://en.innovatiana.com/post/inter-annotator-agreement
