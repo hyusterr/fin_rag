@@ -2,14 +2,13 @@ import json
 import string
 import argparse
 from tqdm.auto import tqdm
-from collections import OrderedDict
+from collections import OrderedDict, Counter, defaultdict
 import numpy as np
 from pprint import pprint
 
-from .utils import read_jsonl, read_trec, preprocess_annotations
-from .utils import TYPE_MAP, TOPIC_MAP, SUBTOPIC_MAP
+from utils import read_jsonl, read_trec, preprocess_annotations
+from utils import TYPE_MAP, TOPIC_MAP, SUBTOPIC_MAP
 
-# [2024-09-17] TODO: figure out how to use relative import...
 def aggregate_highlights_complex(annotation_files, output_file):
     # tentative aggregate settings:
     # 1. based on agreement level of types:
@@ -18,16 +17,45 @@ def aggregate_highlights_complex(annotation_files, output_file):
     # 2. based on agreement level of tokens: what if we only use the tokens that have high agreement level?
     #     a. pick the highest agreed tokens (on 0 or 1) as "signal/non-signal center", which are an atomic-level annotation, and then expand the centers
     annotator_annotations, sample_id_set = preprocess_annotations(annotation_files)
+    type_stats = Counter()
+    result = defaultdict(Counter)
+    total_num_of_tokens = 0
     for sample_id in sample_id_set:
-        samples = [a[sample_id] for a in annotator_annotations] # list of dict
-        voting_label = np.mean([s['binary_labels'] for s in samples])
-        pprint(voting_label)
-        pprint(samples)
+        samples = [annotator_annotations[annotator_id][sample_id] for annotator_id in annotator_annotations.keys()]
+        try:
+            types = [s['signal_type'][0] for s in samples]
+        except:
+            print('[ERROR] signal_type not found: ', sample_id)
+            type_stats['signal_type_not_found'] += 1
+            continue
+        type_agreement = len(set(types))
+        type_stats[f"{type_agreement}_on_types"] += 1
 
+        print(types)
+        voting_label = np.mean([s['binary_labels'] for s in samples], axis=0)
+        for tok, vot in zip(samples[0]['tokens'], voting_label):
+            if vot == 0.0:
+                result[f'{type_agreement}_on_types']['token_all_0'] += 1
+                print(f'|{tok} {round(vot, 3)}|', end='\t')
+            elif vot == 1.0 or vot > 0.6:
+                result[f'{type_agreement}_on_types']['token_all_1'] += 1
+                print(f'|{tok} {round(vot, 3)}|', end='\t')
+            else:
+                result[f'{type_agreement}_on_types']['token_mixed'] += 1
+                print(f'{tok}', end='\t')
+            total_num_of_tokens += 1
+        print()
 
-        break
-
-
+    print('Type stats:')
+    for k, v in type_stats.items():
+        print(f'{k}: {v} ({round(v/len(sample_id_set)*100, 2)}%)')
+    print('Token stats:')
+    print()
+    print('Total number of tokens from vaild annotation:', total_num_of_tokens)
+    for typ, counter in result.items():
+        print(typ)
+        for k, v in counter.items():
+            print(f'{k}: {v} ({round(v/total_num_of_tokens*100, 2)}%)')
 
    
 
