@@ -1,7 +1,6 @@
 # evaluate the annotation quality of the dataset
 import string
 from typing import List
-from annotation.aggregate_annotation import read_jsonl, TOPIC_MAP, SUBTOPIC_MAP, TYPE_MAP
 import argparse
 from collections import defaultdict, OrderedDict, Counter
 from itertools import combinations, permutations, product
@@ -9,7 +8,7 @@ import pandas as pd
 import numpy as np
 from statsmodels.stats.inter_rater import fleiss_kappa, aggregate_raters
 
-
+from utils import read_jsonl, TOPIC_MAP, SUBTOPIC_MAP, TYPE_MAP
 
 def preprocess_sample(sample):
     sample_id = sample['id']
@@ -240,7 +239,7 @@ def evaluate_annotation(annotation_files):
         inter_annotator_metrics['no_agreement_on_tokens'].append(no_agreement_on_tokens)
 
         # span-level agreement
-        annotator_pairs = list(combinations(range(len(annotators)), 2))
+        annotator_pairs = list(permutations(range(len(annotators)), 2))
         span_level_agreement = []
         for a1, a2 in annotator_pairs:
             # List of List[int]
@@ -252,13 +251,12 @@ def evaluate_annotation(annotation_files):
 
             else:
                 span_a1_agreements = evaluate_span_agreement(span1_ids, span2_ids)
-                span_a2_agreements = evaluate_span_agreement(span2_ids, span1_ids)
                 # the annotation-level: one annotator-span has one result
-                for res in span_a1_agreements + span_a2_agreements:
+                for res in span_a1_agreements:
                     for key, value in res.items():
                         inter_annotator_metrics[key].append(value)
 
-                span_level_agreement += span_a1_agreements + span_a2_agreements
+                span_level_agreement += span_a1_agreements
         
 
         # iterate over sample

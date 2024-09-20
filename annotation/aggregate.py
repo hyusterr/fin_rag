@@ -33,16 +33,27 @@ def aggregate_highlights_complex(annotation_files, output_file):
 
         print(types)
         voting_label = np.mean([s['binary_labels'] for s in samples], axis=0)
+        types_counter = Counter(types)
+
+        if types_counter["0"] >= 2:
+            voting_label = [0.0] * len(voting_label)
+
         for tok, vot in zip(samples[0]['tokens'], voting_label):
             if vot == 0.0:
                 result[f'{type_agreement}_on_types']['token_all_0'] += 1
+                result['all_samples']['token_all_0'] += 1
                 print(f'|{tok} {round(vot, 3)}|', end='\t')
-            elif vot == 1.0 or vot > 0.6:
+            elif vot == 1.0:
                 result[f'{type_agreement}_on_types']['token_all_1'] += 1
+                result['all_samples']['token_all_1'] += 1
                 print(f'|{tok} {round(vot, 3)}|', end='\t')
             else:
                 result[f'{type_agreement}_on_types']['token_mixed'] += 1
-                print(f'{tok}', end='\t')
+                result['all_samples']['token_mixed'] += 1
+                if vot > 0.6:
+                    print(f'|{tok} {round(vot, 3)}|', end='\t')
+                else:
+                    print(f'{tok}', end='\t')
             total_num_of_tokens += 1
         print()
 
