@@ -2,6 +2,7 @@ import sys
 import argparse
 from termcolor import colored
 from pathlib import Path
+from tqdm.auto import tqdm
 from utils import read_jsonl, TYPE_MAP, TOPIC_MAP, SUBTOPIC_MAP
 def color_highlights(text, highlights, color='yellow'):
     for highlight in highlights:
@@ -60,9 +61,10 @@ if __name__ == "__main__":
     argparser.add_argument("--restart_id", '-r', help="Restart from this ID")
     args = argparser.parse_args()
     annotations = read_jsonl(args.input)
+    # bar = progressbar.ProgressBar(maxval=len(annotations), widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
+    pbar = tqdm(total=len(annotations))
     
     # check if restart id exists
-    start_index = 0
     found = False
     if args.restart_id: # command line argument have the highest priority
         restart_id = args.restart_id
@@ -72,6 +74,7 @@ if __name__ == "__main__":
     else:
         restart_id = None
 
+    start_index = 0
     if restart_id:
         for annotation in annotations:
             if annotation["id"] == restart_id:
@@ -81,6 +84,8 @@ if __name__ == "__main__":
         if not found:
             print("Restart ID not found")
             sys.exit(1)
+
+    pbar.update(start_index)
     annotations = annotations[start_index:]
     print("=====================================")
     print("Start from lineno:", start_index + 1)
@@ -88,13 +93,14 @@ if __name__ == "__main__":
 
     # view annotations
     for annotation in annotations:
+
         command = input('Press Enter to continue, q + Enter to quit: ')
         if command == 'q':
             with open(".restart_id.tmp", "w") as f:
                 f.write(annotation["id"])
             break
         message = classify_error(annotation)
-        print("ID:", annotation["id"])
+        print("ID:", annotation["id"], ";lineno:", start_index + 1)
         print(message)
         num_of_types = sum(annotation["type"].values())
         if num_of_types != 1:
@@ -120,6 +126,8 @@ if __name__ == "__main__":
             if v != 0:
                 print(TOPIC_MAP[k])
         print("-" * 100)
+        pbar.update(1)
+        start_index += 1
 
 """
 {"id": "20221028_10-K_320193_part2_item7_para1", "text": "the following discussion should be read in conjunction with the consolidated financial statements and accompanying notes included in part ii, item 8 of this form 10-k. this section of this form 10-k generally discusses 2022 and 2021 items and year-to-year comparisons between 2022 and 2021. discussions of 2020 items and year-to-year comparisons between 2021 and 2020 are not included in this form 10-k, and can be found in \"management's discussion and analysis of financial condition and results of operations\" in part ii, item 7 of the company's annual report on form 10-k for the fiscal year ended september 25, 2021.", "highlight": "", "type": {"0": 1, "1": 0, "2": 0, "3": 0, "4": 0}, "topic": {"1": 1, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, "0": 0}}
