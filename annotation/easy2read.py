@@ -5,7 +5,7 @@ from utils import read_jsonl, TYPE_MAP, TOPIC_MAP, SUBTOPIC_MAP
 
 def color_highlights(text, highlights, color='yellow'):
     for highlight in highlights:
-        text = text.replace(highlight, colored(highlight, color))
+        text = text.replace(highlight, colored(highlight.strip(), color))
     return text
 
 
@@ -94,6 +94,9 @@ if __name__ == "__main__":
             print("Text:")
             print(color_highlights(annotation["text"], highlight.split("|||"))) 
         print("Topics:", annotation["topic"])
+        for k, v in annotation["topic"].items():
+            if v != 0:
+                print(TOPIC_MAP[k])
         print("-" * 100)
 
 """
