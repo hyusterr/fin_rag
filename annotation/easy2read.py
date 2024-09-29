@@ -1,11 +1,13 @@
 import sys
 import argparse
 from termcolor import colored
+from pathlib import Path
 from utils import read_jsonl, TYPE_MAP, TOPIC_MAP, SUBTOPIC_MAP
 
 def color_highlights(text, highlights, color='yellow'):
     for highlight in highlights:
-        text = text.replace(highlight, colored(highlight.strip(), color))
+        highlight = highlight.strip()
+        text = text.replace(highlight, colored(highlight, color))
     return text
 
 
@@ -58,23 +60,37 @@ if __name__ == "__main__":
     argparser.add_argument("--input", '-i', help="Input file", required=True)
     argparser.add_argument("--restart_id", '-r', help="Restart from this ID")
     args = argparser.parse_args()
-
     annotations = read_jsonl(args.input)
+    
+    # check if restart id exists
     start_index = 0
     found = False
-    if args.restart_id:
+    if args.restart_id: # command line argument have the highest priority
+        restart_id = args.restart_id
+    elif Path(".restart_id.tmp").exists():
+        with open(".restart_id.tmp", "r") as f:
+            restart_id = f.read().strip()
+    else:
+        restart_id = None
+
+    if restart_id:
         for annotation in annotations:
-            if annotation["id"] == args.restart_id:
+            if annotation["id"] == restart_id:
                 found = True
                 break
             start_index += 1
         if not found:
             print("Restart ID not found")
             sys.exit(1)
-
     annotations = annotations[start_index:]
+
+    # view annotations
     for annotation in annotations:
-        input('Press Enter to continue')
+        command = input('Press Enter to continue')
+        if command == 'q':
+            with open(".restart_id.tmp", "w") as f:
+                f.write(annotation["id"])
+            break
         message = classify_error(annotation)
         print("ID:", annotation["id"])
         print(message)
