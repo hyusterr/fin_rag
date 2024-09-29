@@ -3,7 +3,6 @@ import argparse
 from termcolor import colored
 from pathlib import Path
 from utils import read_jsonl, TYPE_MAP, TOPIC_MAP, SUBTOPIC_MAP
-
 def color_highlights(text, highlights, color='yellow'):
     for highlight in highlights:
         highlight = highlight.strip()
@@ -86,7 +85,7 @@ if __name__ == "__main__":
 
     # view annotations
     for annotation in annotations:
-        command = input('Press Enter to continue')
+        command = input('Press Enter to continue, q + Enter to quit: ')
         if command == 'q':
             with open(".restart_id.tmp", "w") as f:
                 f.write(annotation["id"])
@@ -94,20 +93,24 @@ if __name__ == "__main__":
         message = classify_error(annotation)
         print("ID:", annotation["id"])
         print(message)
-        print("Number of types:", sum(annotation["type"].values()), annotation["type"])
+        num_of_types = sum(annotation["type"].values())
+        if num_of_types != 1:
+            num_of_types = colored(num_of_types, "red")
+        print("Number of types:", num_of_types, "types dict:", annotation["type"])
         for k, v in annotation["type"].items():
             if v != 0:
-                print(TYPE_MAP[k])
+                print(colored(TYPE_MAP[k], "light_blue"))
         print("Highlight:")
         highlight = annotation["highlight"]
         if highlight == "":
             print("No highlight")
-            print("Text:")
+            # print("Text:")
             print(annotation["text"])
         else:
-            for h in highlight.split("|||"):
-                print(h)
-            print("Text:")
+            # for h in highlight.split("|||"):
+            #     print(h)
+            # print("Text:")
+            print("Number of highlights:", len(highlight.split("|||")))
             print(color_highlights(annotation["text"], highlight.split("|||"))) 
         print("Topics:", annotation["topic"])
         for k, v in annotation["topic"].items():
