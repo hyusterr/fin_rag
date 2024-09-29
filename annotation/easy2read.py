@@ -82,6 +82,7 @@ if __name__ == "__main__":
             print("Restart ID not found")
             sys.exit(1)
     annotations = annotations[start_index:]
+    print("Start from lineno:", start_index + 1)
 
     # view annotations
     for annotation in annotations:
