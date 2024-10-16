@@ -250,11 +250,15 @@ def evaluate_annotation(annotation_files):
                 continue
 
             else:
+                this_paragraph_metrics = defaultdict(list)
                 span_a1_agreements = evaluate_span_agreement(span1_ids, span2_ids)
                 # the annotation-level: one annotator-span has one result
                 for res in span_a1_agreements:
                     for key, value in res.items():
-                        inter_annotator_metrics[key].append(value)
+                        this_paragraph_metrics[key].append(value)
+
+                for key, value in this_paragraph_metrics.items():
+                    inter_annotator_metrics[key].append(np.nanmean(value))
 
                 span_level_agreement += span_a1_agreements
         
