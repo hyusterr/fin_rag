@@ -5,74 +5,190 @@ from tqdm.auto import tqdm
 from collections import OrderedDict, Counter, defaultdict
 import numpy as np
 from pprint import pprint
+from termcolor import colored, cprint
 
 from utils import read_jsonl, read_trec, preprocess_annotations
 from utils import TYPE_MAP, TOPIC_MAP, SUBTOPIC_MAP
 
-def aggregate_highlights_complex(annotation_files, output_file):
+def print_colored_highlight(labels, tokens):
+    for i, label in enumerate(labels):
+        if label == 1:
+            cprint(tokens[i], 'white', 'on_yellow', end=' ')
+        elif label == 0:
+            cprint(tokens[i], 'light_grey', end=' ')
+        else:
+            cprint(tokens[i], 'light_blue', end=' ')
+    print()
+
+def get_highlight_spans(labels, tokens):
+    spans = []
+    span_ids = []
+    i = 0
+    while i < len(labels):
+        if labels[i] == 1:
+            start = i
+            tmp_sid = []
+            while i < len(labels) and labels[i] == 1:
+                tmp_sid.append(i)
+                i += 1
+                # when jump out of the inner while loop, i is the first index that is not 1
+            span_ids.append(tmp_sid)
+            end = i
+            spans.append(" ".join(tokens[start: end]))
+        else:
+            i += 1
+    return {"spans": spans, "span_ids": span_ids}
+
+def aggregate_highlights(annotation_files, output_file, agreement_threshold=0.5, verbose=False):
     # tentative aggregate settings:
+    # 0. naive: just average the probabilities by tokens
     # 1. based on agreement level of types:
     #     a. all agree on type --> use it as label
     #     b. some agree on type --> P(token|type); something like empirical bayes sum of probabilities?
     # 2. based on agreement level of tokens: what if we only use the tokens that have high agreement level?
     #     a. pick the highest agreed tokens (on 0 or 1) as "signal/non-signal center", which are an atomic-level annotation, and then expand the centers
+
+    # initialize
     annotator_annotations, sample_id_set = preprocess_annotations(annotation_files)
     type_stats = Counter()
-    result = defaultdict(Counter)
+    signal_stats = defaultdict(Counter)
     total_num_of_tokens = 0
+    result = []
+
     for sample_id in sample_id_set:
         samples = [annotator_annotations[annotator_id][sample_id] for annotator_id in annotator_annotations.keys()]
+        tokens = samples[0]['tokens']
+        texts = samples[0]['text']
         try:
             types = [s['signal_type'][0] for s in samples]
         except:
             print('[ERROR] signal_type not found: ', sample_id)
             type_stats['signal_type_not_found'] += 1
             continue
-        type_agreement = len(set(types))
+        try:
+            topics = [s['topic'][0] for s in samples]
+        except:
+            print('[ERROR] topic not found: ', sample_id)
+            type_stats['topic_not_found'] += 1
+            continue
+        subtopics = [s['subtopic'][0] if s['subtopic'] else 'None' for s in samples]
+
+        # collect information about signal types
+        type_agreement = len(set(types)) # how many types are there
         type_stats[f"{type_agreement}_on_types"] += 1
-
-        print(types)
-        voting_label = np.mean([s['binary_labels'] for s in samples], axis=0)
         types_counter = Counter(types)
-
-        if types_counter["0"] >= 2:
-            voting_label = [0.0] * len(voting_label)
-
-        for tok, vot in zip(samples[0]['tokens'], voting_label):
-            if vot == 0.0:
-                result[f'{type_agreement}_on_types']['token_all_0'] += 1
-                result['all_samples']['token_all_0'] += 1
-                print(f'|{tok} {round(vot, 3)}|', end='\t')
-            elif vot == 1.0:
-                result[f'{type_agreement}_on_types']['token_all_1'] += 1
-                result['all_samples']['token_all_1'] += 1
-                print(f'|{tok} {round(vot, 3)}|', end='\t')
+        voted_type = max(types_counter, key=types_counter.get)
+        voted_topic = max(Counter(topics), key=Counter(topics).get)
+        voted_subtopic = max(Counter(subtopics), key=Counter(subtopics).get)
+        
+        
+        # all different types of span aggregation
+        voting_label = np.mean([s['binary_labels'] for s in samples], axis=0)
+        naive_label = [1 if v > agreement_threshold else 0 for v in voting_label]
+        loose_label = [1 if v != 0 else 0 for v in voting_label]
+        strict_label = [int(v) if v == 1 or v == 0 else None for v in voting_label]
+        harsh_label = [1 if v == 1 else 0 for v in voting_label]
+        complex_label, marker, ticker = [], 0, []
+        for i, label in enumerate(strict_label):
+            if label is not None:
+                if ticker:
+                    if marker and label:
+                        complex_label.extend([1] * len(ticker))
+                    else:
+                        complex_label.extend([0] * len(ticker))
+                    ticker = []
+                complex_label.append(label)
+                marker = label
             else:
-                result[f'{type_agreement}_on_types']['token_mixed'] += 1
-                result['all_samples']['token_mixed'] += 1
-                if vot > 0.6:
-                    print(f'|{tok} {round(vot, 3)}|', end='\t')
-                else:
-                    print(f'{tok}', end='\t')
-            total_num_of_tokens += 1
-        print()
+                ticker.append(i)
+        if ticker: # deal with the last part
+            complex_label.extend([0] * len(ticker))
+        assert len(voting_label) == len(naive_label) == len(loose_label) == len(strict_label) == len(complex_label) == len(harsh_label), f"Length not equal: [VOTE]{len(voting_label)}, [NAIVE]{len(naive_label)}, [LOOSE]{len(loose_label)}, [STRICT]{len(strict_label)}, [COMPLEX]{len(complex_label)}, [HARSH]{len(harsh_label)}"
 
+        # collect output
+        result.append({
+            "sample_id": sample_id,
+            "text": texts,
+            "tokens": tokens,
+            "types": voted_type,
+            "topics": voted_topic,
+            "subtopics": voted_subtopic,
+            "highlight_probs:": [round(v, 4) for v in voting_label],
+            "naive_aggregation": {
+                "label": naive_label,
+                "highlights": get_highlight_spans(naive_label, tokens)
+            },
+            "loose_aggregation": {
+                "label": loose_label,
+                "highlights": get_highlight_spans(loose_label, tokens)
+            },
+            "strict_aggregation": {
+                "label": strict_label,
+                "highlights": get_highlight_spans(strict_label, tokens)
+            },
+            "harsh_aggregation": {
+                "label": harsh_label,
+                "highlights": get_highlight_spans(harsh_label, tokens)
+            },
+            "complex_aggregation": {
+                "label": complex_label,
+                "highlights": get_highlight_spans(complex_label, tokens)
+            },
+        })
+
+
+
+        # collect statistics
+        # [TODO] collect statistics
+
+       
+        # visualize the annotation
+        if verbose:
+            print(f"Sample ID: {sample_id}")
+            print(f"Types: {types_counter}")
+            for i, s in enumerate(samples):
+                print(f"Annotator {i}:")
+                print_colored_highlight(s['binary_labels'], tokens)
+            print('[voting]:', [round(v, 3) for v in voting_label])
+            print_colored_highlight(voting_label, tokens)
+            print('[naive]:', naive_label)
+            print_colored_highlight(naive_label, tokens)
+            print('[loose]:', loose_label)
+            print_colored_highlight(loose_label, tokens)
+            print('[strict]:', strict_label)
+            print_colored_highlight(strict_label, tokens)
+            print('[harsh]:', harsh_label)
+            print_colored_highlight(harsh_label, tokens)
+            print('[complex]:', complex_label)
+            print_colored_highlight(complex_label, tokens)
+            print('='*50)
+
+
+    # TODO: figure out what statistics to collect
+    # output statistics
     print('Type stats:')
     for k, v in type_stats.items():
         print(f'{k}: {v} ({round(v/len(sample_id_set)*100, 2)}%)')
     print('Token stats:')
     print()
     print('Total number of tokens from vaild annotation:', total_num_of_tokens)
+    '''
     for typ, counter in result.items():
         print(typ)
         for k, v in counter.items():
             print(f'{k}: {v} ({round(v/total_num_of_tokens*100, 2)}%)')
-
-   
-
-
-def aggregate_highlights_naive(annotation_files, output_file, agreement_threshold=0.5):
     '''
+
+    # output result
+    with open(output_file, "w") as f:
+        for r in result:
+            f.write(json.dumps(r) + "\n")
+
+    with open(output_file.replace(".jsonl", "_pretty.json"), "w") as f:
+        json.dump(result, f, indent=2) 
+
+
+'''
     annotation_files: list of annotation files
     - FORMAT (of a line): {
         "id": ID,
@@ -91,134 +207,11 @@ def aggregate_highlights_naive(annotation_files, output_file, agreement_threshol
         "highlight_spans: [SPAN1, SPAN2, ...], # list of all highlights spans base on labels
         "type": TYPE, # majority vote
         "topic": TOPIC, # majority vote
-    '''
-    annotations = [read_jsonl(file) for file in annotation_files]
-    n_annotators = len(annotations)
-    annotator_id = 0
-    output = OrderedDict()
-    for anno in annotations:
-        annotator_id += 1
-        for sample in tqdm(anno):
-            # print(sample["id"])
-            tokens = sample["text"].split() 
-            normalized_tokens = [t.translate(str.maketrans('', '', string.punctuation)).lower() for t in tokens]    
-
-            if sample["id"] not in output:
-                # TODO: use Spacy to tokenize
-                output[sample["id"]] = {
-                    "id": sample["id"],
-                    "text": sample["text"],
-                    "tokens": tokens,
-                    "highlight_probs": [0] * len(tokens),
-                    "highlight_labels": [],
-                    "highlight_spans": [],
-                    "type": [],
-                    "topic": [],
-                    "subtopic": [],
-                    "annotator_id": []
-                }
-
-            # record the annotator id
-            if annotator_id not in output[sample["id"]]["annotator_id"]:
-                output[sample["id"]]["annotator_id"].append(annotator_id)
-            else:
-                print(f"Duplicate annotation for {sample['id']} by annotator {annotator_id}, keep the first one.")
-                continue
-
-
-            if sample["highlight"] != "":
-                span_tokens = [s.split() for s in sample["highlight"].split("|||")] # tokenized spans into tokens
-                # filter out empty spans
-                span_tokens = [s for s in span_tokens if s != []]
-                # because some of the spans will include punctuation, we need to normalize the tokens
-                normalized_span_tokens = [[t.translate(str.maketrans('', '', string.punctuation)).lower() for t in s] for s in span_tokens] # span tokens without punctuation
-
-
-                # get the id of the tokens
-                span_already_checked = 0
-                i = 0
-                while i < len(tokens):
-                    if span_already_checked == len(span_tokens):
-                        break
-                    
-                    if normalized_tokens[i] == normalized_span_tokens[span_already_checked][0]:
-                        # print(normalized_tokens[i:i+len(span_tokens[span_already_checked])], normalized_span_tokens[span_already_checked])
-                        # BUG: there might be highlights = "||| |||"
-                        if normalized_tokens[i:i+len(normalized_span_tokens[span_already_checked])] == normalized_span_tokens[span_already_checked]:
-                            for j in range(len(span_tokens[span_already_checked])):
-                                output[sample["id"]]["highlight_probs"][i+j] += 1
-                            i += len(span_tokens[span_already_checked])
-                            span_already_checked += 1
-                        else:
-                            i += 1
-                    else:
-                        i += 1
-            else: # no highlight
-                for i in range(len(tokens)):
-                    output[sample["id"]]["highlight_probs"][i] += 0
-
-            # collect type and topic
-            type_ = max(sample["type"], key=sample["type"].get)
-            topic_ = max(sample["topic"], key=sample["topic"].get)
-            if sample["topic"][topic_] > 1:
-                subtopic_ = topic_ + "-" + str(sample["topic"][topic_])
-            else:
-                subtopic_ = ""
-            output[sample["id"]]["type"].append(type_)
-            output[sample["id"]]["topic"].append(topic_)
-            output[sample["id"]]["subtopic"].append(subtopic_)
-    
-    
-    # calculate the average of highlight_probs
-    validation_stats = {
-        "token_agreement": [],
-        "type_agreement": [],
-    }
-    for sample in output.values():
-        # BUG: duplicate highlights under an annotator, leads to probs > 1
-
-        # check agreement
-        all_0_count = sum([1 for p in sample["highlight_probs"] if p == 0])
-        all_1_count = sum([1 for p in sample["highlight_probs"] if p == n_annotators])
-        all_agree_count = all_1_count + all_0_count
-        token_agreement = all_agree_count / len(sample["highlight_probs"])
-        validation_stats["token_agreement"].append(token_agreement)
-
-        type_agreement = len(set(sample["type"])) == 1
-        validation_stats["type_agreement"].append(type_agreement)
-
-        sample["highlight_probs"] = [p/n_annotators for p in sample["highlight_probs"]]
-        assert all([p <= 1 for p in sample["highlight_probs"]])
-
-        sample["highlight_labels"] = [1 if p > agreement_threshold else 0 for p in sample["highlight_probs"]]
-        # get the spans
-        i = 0
-        while i < len(sample["highlight_labels"]):
-            if sample["highlight_labels"][i] == 1:
-                start = i
-                while i < len(sample["highlight_labels"]) and sample["highlight_labels"][i] == 1:
-                    i += 1
-                end = i
-                sample["highlight_spans"].append((start, end))
-            else:
-                i += 1
-        sample["highlight_spans"] = [" ".join(sample["tokens"][start: end-1]) for start, end in sample["highlight_spans"]]
-        assert len(sample["type"]) == n_annotators
-        sample["type"] = max(sample["type"], key=sample["type"].count)
-
-        assert len(sample["topic"]) == n_annotators
-        sample["topic"] = max(sample["topic"], key=sample["topic"].count)
-
-        assert len(sample["subtopic"]) == n_annotators
-        sample["subtopic"] = max(sample["subtopic"], key=sample["subtopic"].count)
-
-    with open(output_file, "w") as f:
-        for sample in output.values():
-            f.write(json.dumps(sample) + "\n")
-
-    print("Agreement stats:")
-    print(f"Token agreement: {sum(validation_stats['token_agreement']) / len(validation_stats['token_agreement'])}")
-    print(f"Type agreement: {sum(validation_stats['type_agreement']) / len(validation_stats['type_agreement'])}")
+'''
+# print(f"Duplicate annotation for {sample['id']} by annotator {annotator_id}, keep the first one.")
+# normalized_span_tokens = [[t.translate(str.maketrans('', '', string.punctuation)).lower() for t in s] for s in span_tokens] # span tokens without punctuation
+# BUG: there might be highlights = "||| |||"
+# BUG: duplicate highlights under an annotator, leads to probs > 1
 
 
 def aggregate_retrieval(annotation_files, output_file):
@@ -251,11 +244,8 @@ if __name__ == "__main__":
     parser.add_argument("--task", "-t", help="Task to aggregate", choices=["highlight", "retrieval"], default="highlight")
     args = parser.parse_args()
 
-    aggregate_highlights_complex(args.annotation_files, args.output_file)
     
-    '''
     if args.task == "retrieval":
         aggregate_retrieval(args.annotation_files, args.output_file)
     elif args.task == "highlight":
-        aggregate_highlights(args.annotation_files, args.output_file, args.agreement_threshold)
-    '''
+        aggregate_highlights(args.annotation_files, args.output_file, agreement_threshold=args.agreement_threshold)
