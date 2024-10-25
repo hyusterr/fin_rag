@@ -4,6 +4,7 @@ import argparse
 from tqdm.auto import tqdm
 from collections import OrderedDict, Counter, defaultdict
 import numpy as np
+import pandas as pd
 from pprint import pprint
 from termcolor import colored, cprint
 
@@ -59,18 +60,15 @@ def aggregate_highlights(annotation_files, output_file, agreement_threshold=0.5,
         samples = [annotator_annotations[annotator_id][sample_id] for annotator_id in annotator_annotations.keys()]
         tokens = samples[0]['tokens']
         texts = samples[0]['text']
-        try:
-            types = [s['signal_type'][0] for s in samples]
-        except:
+        types = [s['signal_type'][0] if s['signal_type'] else None for s in samples]
+        if None in types:
             print('[ERROR] signal_type not found: ', sample_id)
             type_stats['signal_type_not_found'] += 1
-            continue
-        try:
-            topics = [s['topic'][0] for s in samples]
-        except:
+            
+        topics = [s['topic'][0] if s['topic'] else None for s in samples]
+        if None in topics:
             print('[ERROR] topic not found: ', sample_id)
             type_stats['topic_not_found'] += 1
-            continue
         subtopics = [s['subtopic'][0] if s['subtopic'] else 'None' for s in samples]
 
         # collect information about signal types
@@ -106,7 +104,7 @@ def aggregate_highlights(annotation_files, output_file, agreement_threshold=0.5,
         assert len(voting_label) == len(naive_label) == len(loose_label) == len(strict_label) == len(complex_label) == len(harsh_label), f"Length not equal: [VOTE]{len(voting_label)}, [NAIVE]{len(naive_label)}, [LOOSE]{len(loose_label)}, [STRICT]{len(strict_label)}, [COMPLEX]{len(complex_label)}, [HARSH]{len(harsh_label)}"
 
         # collect output
-        result.append({
+        this_sample = {
             "sample_id": sample_id,
             "text": texts,
             "tokens": tokens,
@@ -116,7 +114,7 @@ def aggregate_highlights(annotation_files, output_file, agreement_threshold=0.5,
             "highlight_probs:": [round(v, 4) for v in voting_label],
             "naive_aggregation": {
                 "label": naive_label,
-                "highlights": get_highlight_spans(naive_label, tokens)
+                "highlights": get_highlight_spans(naive_label, tokens) # spans, span_ids
             },
             "loose_aggregation": {
                 "label": loose_label,
@@ -134,12 +132,22 @@ def aggregate_highlights(annotation_files, output_file, agreement_threshold=0.5,
                 "label": complex_label,
                 "highlights": get_highlight_spans(complex_label, tokens)
             },
-        })
+        }
+        result.append(this_sample)
 
 
-
-        # collect statistics
         # [TODO] collect statistics
+        num_of_tokens = len(tokens)
+        total_num_of_tokens += num_of_tokens
+        for method in ["naive", "loose", "strict", "harsh", "complex"]:
+            num_of_highlight_spans = len(this_sample[f"{method}_aggregation"]['highlights']['spans'])
+            replace_output_label = [v if v is not None else 'None' for v in this_sample[f"{method}_aggregation"]['label']]
+            token_type_couter = Counter(replace_output_label)
+
+            signal_stats[method]['num_of_highlight_spans'] += num_of_highlight_spans
+            signal_stats[method]['num_of_highlight_tokens'] += sum([1 for v in this_sample[f"{method}_aggregation"]['label'] if v == 1])
+            for k, v in token_type_couter.items():
+                signal_stats[method]['token_' + str(k)] += v / num_of_tokens
 
        
         # visualize the annotation
@@ -162,6 +170,7 @@ def aggregate_highlights(annotation_files, output_file, agreement_threshold=0.5,
             print('[complex]:', complex_label)
             print_colored_highlight(complex_label, tokens)
             print('='*50)
+            break
 
 
     # TODO: figure out what statistics to collect
@@ -169,23 +178,38 @@ def aggregate_highlights(annotation_files, output_file, agreement_threshold=0.5,
     print('Type stats:')
     for k, v in type_stats.items():
         print(f'{k}: {v} ({round(v/len(sample_id_set)*100, 2)}%)')
-    print('Token stats:')
-    print()
-    print('Total number of tokens from vaild annotation:', total_num_of_tokens)
-    '''
-    for typ, counter in result.items():
-        print(typ)
-        for k, v in counter.items():
-            print(f'{k}: {v} ({round(v/total_num_of_tokens*100, 2)}%)')
-    '''
+    span_token_stats_dict = {}
+    for method in ["naive", "loose", "strict", "harsh", "complex"]:
+        num_of_highlight_spans = signal_stats[method]['num_of_highlight_spans']
+        num_of_highlight_tokens = signal_stats[method]['num_of_highlight_tokens']
+        average_num_of_highlight_spans = num_of_highlight_spans / len(sample_id_set)
+        average_num_of_highlight_tokens = num_of_highlight_tokens / len(sample_id_set)
+        average_token_in_a_highlight_span = num_of_highlight_tokens / num_of_highlight_spans
+        span_token_stats_dict[method] = {
+            "num of highlight spans": round(num_of_highlight_spans, 4),
+            "num of highlight tokens": round(num_of_highlight_tokens, 4),
+            "average num of highlight spans": round(average_num_of_highlight_spans, 4),
+            "average num of highlight tokens": round(average_num_of_highlight_tokens, 4),
+            "average token in a highlight span": round(average_token_in_a_highlight_span, 4),
+        }
+
+        for k, v in signal_stats[method].items():
+            if k not in ['num_of_highlight_spans', 'num_of_highlight_tokens']:
+                span_token_stats_dict[method][f'average ratio of {k}'] = round(v/len(sample_id_set), 4) * 100
+
+    # change the statistics to df
+    print('Span token stats:')
+    pprint(span_token_stats_dict)
+    print("average token in a sample:", total_num_of_tokens / len(sample_id_set))
+    pd.DataFrame(span_token_stats_dict).to_csv('span_token_stats.csv')
+    
+    # print('Total number of tokens from vaild annotation:', total_num_of_tokens)
 
     # output result
     with open(output_file, "w") as f:
         for r in result:
             f.write(json.dumps(r) + "\n")
 
-    with open(output_file.replace(".jsonl", "_pretty.json"), "w") as f:
-        json.dump(result, f, indent=2) 
 
 
 '''
@@ -242,10 +266,11 @@ if __name__ == "__main__":
     parser.add_argument("--output_file", "-o", help="Output file", default="output.jsonl")
     parser.add_argument("--agreement_threshold", "-at", type=float, help="Threshold for agreement", default=0.5)
     parser.add_argument("--task", "-t", help="Task to aggregate", choices=["highlight", "retrieval"], default="highlight")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Print verbose output")
     args = parser.parse_args()
 
     
     if args.task == "retrieval":
         aggregate_retrieval(args.annotation_files, args.output_file)
     elif args.task == "highlight":
-        aggregate_highlights(args.annotation_files, args.output_file, agreement_threshold=args.agreement_threshold)
+        aggregate_highlights(args.annotation_files, args.output_file, agreement_threshold=args.agreement_threshold, verbose=args.verbose)

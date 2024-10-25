@@ -111,7 +111,7 @@ def preprocess_sample(sample):
             'binary_labels': binary_labels,
             'signal_type': signal_type,
             'topic': topic,
-            'sub_topic': sub_topic,
+            'subtopic': sub_topic,
             'span_ids': span_ids
         }
     }
