@@ -1,0 +1,9 @@
+,naive,loose,strict,harsh,complex
+num of highlight spans,1629.0,2087.0,557.0,557.0,376.0
+num of highlight tokens,20232.0,46922.0,4748.0,4748.0,6585.0
+average num of highlight spans,1.6081,2.0602,0.5499,0.5499,0.3712
+average num of highlight tokens,19.9724,46.3198,4.6871,4.6871,6.5005
+average token in a highlight span,12.4199,22.483,8.5242,8.5242,17.5133
+average ratio of token_1,34.17,64.72,9.42,9.42,12.049999999999999
+average ratio of token_0,65.83,35.28,35.28,90.58,87.94999999999999
+average ratio of token_None,,,55.300000000000004,,

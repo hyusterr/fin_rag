@@ -4,14 +4,20 @@
 class End2EndREHighlighter:
     def __init__(
         self,
-        query_encoder,
-        retriever,
-        highlighter,
+        highlighter, # TokenClassification model
+        query_encoder=None, # 
+        retriever=None, # F(x) --> hidden states
         **kwargs
     ):
         self.query_encoder = query_encoder
         self.retriever = retriever
         self.highlighter = highlighter
+
+        if self.retriever is not None and self.query_encoder is not None:
+            self.retrieval_enhanced = True
+        else:
+            self.retrieval_enhanced = False
+            
 
     def foward(
         self,
