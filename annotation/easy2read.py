@@ -4,6 +4,7 @@ from termcolor import colored
 from pathlib import Path
 from tqdm.auto import tqdm
 from utils import read_jsonl, TYPE_MAP, TOPIC_MAP, SUBTOPIC_MAP
+from aggregate import print_colored_highlight
 def color_highlights(text, highlights, color='yellow'):
     for highlight in highlights:
         highlight = highlight.strip()
@@ -99,35 +100,58 @@ if __name__ == "__main__":
             with open(".restart_id.tmp", "w") as f:
                 f.write(annotation["id"])
             break
-        message = classify_error(annotation)
-        print("ID:", annotation["id"], ";lineno:", start_index + 1)
-        print(message)
-        num_of_types = sum(annotation["type"].values())
-        if num_of_types != 1:
-            num_of_types = colored(num_of_types, "red")
-        print("Number of types:", num_of_types, "types dict:", annotation["type"])
-        for k, v in annotation["type"].items():
-            if v != 0:
-                print(colored(TYPE_MAP[k], "light_blue"))
-        print("Highlight:")
-        highlight = annotation["highlight"]
-        if highlight == "":
-            print("No highlight")
-            # print("Text:")
-            print(annotation["text"])
+
+ 
+        keys = annotation.keys()
+        print(keys)
+        if "naive_aggregation" in keys:
+            tokens = annotation["tokens"]
+            sample_id = annotation["sample_id"]
+            print(f"Sample ID: {sample_id}")
+            print('[probs]:', [round(v, 3) for v in annotation["highlight_probs"]])
+            print_colored_highlight(annotation["highlight_probs"], tokens)
+            print('[naive]:', annotation["naive_aggregation"]["label"])
+            print_colored_highlight(annotation["naive_aggregation"]["label"], tokens)
+            print('[loose]:', annotation["loose_aggregation"]["label"])
+            print_colored_highlight(annotation["loose_aggregation"]["label"], tokens)
+            print('[strict]:', annotation["strict_aggregation"]["label"])
+            print_colored_highlight(annotation["strict_aggregation"]["label"], tokens)
+            print('[harsh]:', annotation["harsh_aggregation"]["label"])
+            print_colored_highlight(annotation["harsh_aggregation"]["label"], tokens)
+            print('[complex]:', annotation["complex_aggregation"]["label"])
+            print_colored_highlight(annotation["complex_aggregation"]["label"], tokens)
+            print('='*50)
+
         else:
-            # for h in highlight.split("|||"):
-            #     print(h)
-            # print("Text:")
-            print("Number of highlights:", len(highlight.split("|||")))
-            print(color_highlights(annotation["text"], highlight.split("|||"))) 
-        print("Topics:", annotation["topic"])
-        for k, v in annotation["topic"].items():
-            if v != 0:
-                print(TOPIC_MAP[k])
-        print("-" * 100)
-        pbar.update(1)
-        start_index += 1
+            message = classify_error(annotation)
+            print("ID:", annotation["id"], ";lineno:", start_index + 1)
+            print(message)
+            num_of_types = sum(annotation["type"].values())
+            if num_of_types != 1:
+                num_of_types = colored(num_of_types, "red")
+            print("Number of types:", num_of_types, "types dict:", annotation["type"])
+            for k, v in annotation["type"].items():
+                if v != 0:
+                    print(colored(TYPE_MAP[k], "light_blue"))
+            print("Highlight:")
+            highlight = annotation["highlight"]
+            if highlight == "":
+                print("No highlight")
+                # print("Text:")
+                print(annotation["text"])
+            else:
+                # for h in highlight.split("|||"):
+                #     print(h)
+                # print("Text:")
+                print("Number of highlights:", len(highlight.split("|||")))
+                print(color_highlights(annotation["text"], highlight.split("|||"))) 
+            print("Topics:", annotation["topic"])
+            for k, v in annotation["topic"].items():
+                if v != 0:
+                    print(TOPIC_MAP[k])
+            print("-" * 100)
+            pbar.update(1)
+            start_index += 1
 
 """
 {"id": "20221028_10-K_320193_part2_item7_para1", "text": "the following discussion should be read in conjunction with the consolidated financial statements and accompanying notes included in part ii, item 8 of this form 10-k. this section of this form 10-k generally discusses 2022 and 2021 items and year-to-year comparisons between 2022 and 2021. discussions of 2020 items and year-to-year comparisons between 2021 and 2020 are not included in this form 10-k, and can be found in \"management's discussion and analysis of financial condition and results of operations\" in part ii, item 7 of the company's annual report on form 10-k for the fiscal year ended september 25, 2021.", "highlight": "", "type": {"0": 1, "1": 0, "2": 0, "3": 0, "4": 0}, "topic": {"1": 1, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, "0": 0}}

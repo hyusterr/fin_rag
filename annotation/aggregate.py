@@ -111,7 +111,7 @@ def aggregate_highlights(annotation_files, output_file, agreement_threshold=0.5,
             "types": voted_type,
             "topics": voted_topic,
             "subtopics": voted_subtopic,
-            "highlight_probs:": [round(v, 4) for v in voting_label],
+            "highlight_probs": [round(v, 4) for v in voting_label],
             "naive_aggregation": {
                 "label": naive_label,
                 "highlights": get_highlight_spans(naive_label, tokens) # spans, span_ids
