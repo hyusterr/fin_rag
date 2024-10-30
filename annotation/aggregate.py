@@ -11,6 +11,11 @@ from termcolor import colored, cprint
 from utils import read_jsonl, read_trec, preprocess_annotations
 from utils import TYPE_MAP, TOPIC_MAP, SUBTOPIC_MAP
 
+import random
+random.seed(42)
+
+NUM_OF_TEST = 100
+
 def print_colored_highlight(labels, tokens):
     for i, label in enumerate(labels):
         if label == 1:
@@ -206,10 +211,29 @@ def aggregate_highlights(annotation_files, output_file, agreement_threshold=0.5,
     # print('Total number of tokens from vaild annotation:', total_num_of_tokens)
 
     # output result
+    num_of_test = NUM_OF_TEST
+    test_filename = output_file.replace('.jsonl', '_test.jsonl')
+    test_id_filename = output_file.replace('.jsonl', '_test_ids.txt')
+    train_filename = output_file.replace('.jsonl', '_train.jsonl')
+    sample_ids = [s['sample_id'] for s in result]
+    test_ids = random.sample(sample_ids, num_of_test)
+    with open(test_filename, "w") as f:
+        for r in result:
+            if r['sample_id'] in test_ids:
+                f.write(json.dumps(r) + "\n")
+
+    with open(test_id_filename, "w") as f:
+        for i in test_ids:
+            f.write(i + "\n")
+
+    with open(train_filename, "w") as f:
+        for r in result:
+            if r['sample_id'] not in test_ids:
+                f.write(json.dumps(r) + "\n")
+
     with open(output_file, "w") as f:
         for r in result:
             f.write(json.dumps(r) + "\n")
-
 
 
 '''
