@@ -130,3 +130,9 @@ def preprocess_annotations(annotation_files):
             sample_id_set.update(preprocessed_sample.keys())
 
     return annotator_annotations, sample_id_set
+
+if __name__ == "__main__":
+    import sys
+    annotation = read_jsonl(sys.argv[1])
+    for a in annotation:
+        print(json.dumps(preprocess_sample(a)))
