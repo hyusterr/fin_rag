@@ -1,8 +1,11 @@
 # from highlighter.base import BERTHighlighter
 from utils.utils import read_jsonl
-
+from torch.utils.data import DataLoader
+import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from transformers import DataCollatorForTokenClassification, TrainingArguments, Trainer, EarlyStoppingCallback
+from transformers.data.data_collator import DataCollatorMixin, pad_without_fast_tokenizer_warning
+from highlighter.agg_highlighter import AggHighlighter
 from datasets import Dataset, load_dataset, DatasetDict
 import evaluate
 from pathlib import Path
@@ -29,7 +32,7 @@ def data_generator_mix_all(data_list):
         for key in data:
             if 'aggregation' in key:
                 labels = data[key]['label']
-                yield {'tokens': tokens, 'labels': labels}
+                yield {'tokens': tokens, 'labels': labels, 'aggregation': key.split('_')[0]}
 
 def data_generator_expert(data_list):
     for data in data_list:
@@ -37,12 +40,24 @@ def data_generator_expert(data_list):
         tokens = data[id_]['tokens']
         texts = data[id_]['text']
         labels = data[id_]['binary_labels']
-        yield {'id': id_, 'tokens': tokens, 'texts': texts, 'labels': labels}
+        yield {'id': id_, 'tokens': tokens, 'texts': texts, 'labels': labels, 'aggregation': 'expert'}
 
 
 tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+# version 1: assign weights
+# version 2: tuning weights
+# version 3: use nn.Embedding to learn the weights
+agg_map = {
+    'strict': 0,
+    'complex': 1,
+    'harsh': 2,
+    'naive': 3,
+    'loose': 4,
+    # 'expert': 5
+}
 def tokenize_and_align_labels(examples):
-    tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True)
+    # parallel pre-process in cpu
+    tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True) # let the collate_fn to pad inside batches 
 
     labels = []
     for i, label in enumerate(examples[f"labels"]):
@@ -51,7 +66,7 @@ def tokenize_and_align_labels(examples):
         label_ids = []
         for word_idx in word_ids:  # Set the special tokens to -100.
             if word_idx is None:
-                label_ids.append(-100)
+                label_ids.append(-100) # for torch.nn.CrossEntropyLoss, ignore_index=-100 by default
             elif label[word_idx] is None: # for null in strict_aggregation
                 label_ids.append(-100) 
             elif word_idx != previous_word_idx:  # Only label the first token of a given word.
@@ -62,6 +77,9 @@ def tokenize_and_align_labels(examples):
         labels.append(label_ids)
 
     tokenized_inputs["labels"] = labels
+    # operate dictionary in this stage instead of gpu
+    tokenized_inputs['aggregation'] = [agg_map[agg] if agg in agg_map else 0 for agg in examples['aggregation']]
+
     return tokenized_inputs
 
 
@@ -89,29 +107,89 @@ def compute_metrics(p):
         "accuracy": results["overall_accuracy"],
     }
 
-# print(train_data[0])
-'''
-print(len(train_data[0]['tokens']))
-for key in train_data[0]:
-    if 'aggregation' in key:
-        print(key)
-        print(len(train_data[0][key]['label']))
-'''
 
-# wnut = load_dataset("wnut_17")
-# print(type(wnut))
+# see: https://github.com/huggingface/transformers/blob/v4.47.1/src/transformers/data/data_collator.py#L288
+# see: https://huggingface.co/docs/transformers/main_classes/data_collator#transformers.DataCollatorForTokenClassification
+# see: https://pytorch.org/docs/stable/data.html
+# see: https://pytorch.org/docs/stable/_modules/torch/utils/data/_utils/collate.html#default_collate
+# see: carefully check the relation between collate_fn and batch and model input, you can do it!
+
+class AggDataCollatorForTokenClassification(DataCollatorForTokenClassification):
+    # collate funtion: the collate_fn argument is used to collate lists of samples into batches.
+    # make sure the output of collate_fn is the input of model, which should only contains tensors
+
+    def __init__(self, tokenizer, padding=True, max_length=None, pad_to_multiple_of=None, label_pad_token_id=-100, return_tensors="pt"):
+        super().__init__(tokenizer=tokenizer, padding=padding, max_length=max_length, pad_to_multiple_of=pad_to_multiple_of, label_pad_token_id=label_pad_token_id, return_tensors=return_tensors)
+    
+    # overwrite torch_call only
+    def torch_call(self, features):
+        # features: a list of dict
+        # print(features)
+        # print(features[0].keys())
+        import torch
+        label_name = "label" if "label" in features[0].keys() else "labels"
+        labels = [feature[label_name] for feature in features] if label_name in features[0].keys() else None
+        no_label_features = [{"input_ids": feature["input_ids"], "attention_mask": feature["attention_mask"]} for feature in features] 
+        batch = pad_without_fast_tokenizer_warning(
+            self.tokenizer,
+            no_label_features,
+            max_length=self.max_length,
+            pad_to_multiple_of=self.pad_to_multiple_of,
+            return_tensors="pt",
+        )
+        agg_labels = [feature["aggregation"] for feature in features]
+        agg_labels = F.one_hot(torch.tensor(agg_labels), num_classes=len(agg_map))
+        batch["aggregation"] = agg_labels # torch.tensor(agg_labels)
+        if labels is None:
+            return batch
+        
+        sequence_length = batch["input_ids"].shape[1]
+        padding_side = self.tokenizer.padding_side
+        
+        def to_list(tensor_or_iterable):
+            if isinstance(tensor_or_iterable, torch.Tensor):
+                return tensor_or_iterable.tolist()
+            return list(tensor_or_iterable)
+
+        if padding_side == "right":
+            batch[label_name] = [
+                to_list(label) + [self.label_pad_token_id] * (sequence_length - len(label)) for label in labels
+            ]
+        else:
+            batch[label_name] = [
+                [self.label_pad_token_id] * (sequence_length - len(label)) + to_list(label) for label in labels
+            ]
+
+        batch[label_name] = torch.tensor(batch["labels"], dtype=torch.int64)
+        return batch
+        
+
+
+
+
+
 train_dataset = Dataset.from_generator(data_generator_mix_all, gen_kwargs={'data_list': train_data})
 test_dataset = Dataset.from_generator(data_generator_mix_all, gen_kwargs={'data_list': test_data})
 expert_dataset = Dataset.from_generator(data_generator_expert, gen_kwargs={'data_list': expert_data})
 highlight_dataset = DatasetDict({'train': train_dataset, 'test': expert_dataset})
 tokenized_datasets = highlight_dataset.map(tokenize_and_align_labels, batched=True)
-data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer)
-model = AutoModelForTokenClassification.from_pretrained("bert-base-uncased", num_labels=2)
 
-print(train_dataset[0])
+# train_dataset.set_format(type='torch')
+print(tokenized_datasets['train'][0])
+# collate_fn: input a list of samples from the dataset and collate them into a batch of data
+data_collator = AggDataCollatorForTokenClassification(tokenizer=tokenizer)
+train_dataloader = DataLoader(tokenized_datasets['train'], batch_size=16, shuffle=True, collate_fn=data_collator)
+instance = next(iter(train_dataloader))
+print(instance)
 
+# model = AutoModelForTokenClassification.from_pretrained("bert-base-uncased", num_labels=2)
+
+model = AggHighlighter()
+print(model(instance))
+
+'''
 training_args = TrainingArguments(
-    output_dir="mix_all_bert",
+    output_dir="checkpoints/agg_highlight",
     learning_rate=2e-5,
     per_device_train_batch_size=16,
     per_device_eval_batch_size=16,
@@ -121,7 +199,19 @@ training_args = TrainingArguments(
     save_strategy="epoch",
     load_best_model_at_end=True,
 )
+print(tokenized_datasets['train'])
+print(type(tokenized_datasets['train']))
+print(len(tokenized_datasets['train']))
+tokenized_datasets['train'].set_format(type='torch')
+train_dataloader = DataLoader(
+        tokenized_datasets['train'].remove_columns(tokenized_datasets["train"].column_names), shuffle=True, collate_fn=data_collator, batch_size=training_args.per_device_train_batch_size
+    )
+print(tokenized_datasets['train'][0])
+print(next(iter(train_dataloader)))
+print(model(next(iter(train_dataloader))))
 
+'''
+'''
 # about specify devices: https://github.com/huggingface/transformers/issues/12570#issuecomment-876009872
 trainer = Trainer(
     model=model,
@@ -135,3 +225,4 @@ trainer = Trainer(
 )
 
 trainer.train()
+'''
