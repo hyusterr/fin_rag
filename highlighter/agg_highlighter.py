@@ -33,21 +33,47 @@ class AggHighlighterDataset(torch.utils.data.Dataset):
 '''
 
 class AggHighlighter(BertForTokenClassification):
-    def __init__(self): #, config): #agg_weights):
-        super(AggHighlighter, self).__init__(BertConfig.from_pretrained('bert-base-uncased', num_labels=2))
+    def __init__(self, config=None, agg_weights_base=0.9):
+        if config is None:
+            config = BertConfig.from_pretrained('bert-base-uncased', num_labels=2)
+        super(AggHighlighter, self).__init__(config)
         # self.agg_weights = agg_weights
-        self.agg_weights = torch.tensor([5, 4, 3, 2, 1])
+        self.agg_weights = torch.tensor([
+            1,
+            agg_weights_base * 1,
+            agg_weights_base**2 * 1,
+            agg_weights_base**3 * 1,
+            agg_weights_base**4 * 1,
+        ])
+        print(self.agg_weights)
+        print(self.device)
 
 
 
-    def forward(self, input_dict):
+    def forward(
+            self, 
+            input_ids,
+            attention_mask=None,
+            labels=None,
+            token_type_ids=None,
+            position_ids=None,
+            head_mask=None,
+            inputs_embeds=None,
+            aggregation=None
+        ):
+
+        if self.agg_weights.device != self.device:
+            self.agg_weights = self.agg_weights.to(self.device)
+
         # print(input_dict)
-        input_ids = input_dict['input_ids']
-        attention_mask = input_dict['attention_mask'] if 'attention_mask' in input_dict else None
-        labels = input_dict['labels'] if 'labels' in input_dict else None
-        token_type_ids = input_dict['token_type_ids'] if 'token_type_ids' in input_dict else None
+        # input_ids = input_dict['input_ids']
+        # attention_mask = input_dict['attention_mask'] if 'attention_mask' in input_dict else None
+        # labels = input_dict['labels'] if 'labels' in input_dict else None
+        # token_type_ids = input_dict['token_type_ids'] if 'token_type_ids' in input_dict else None
         # return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         return_dict = True
+        output_attentions = True
+        output_hidden_states = True
 
         outputs = self.bert(
             input_ids,
@@ -56,8 +82,8 @@ class AggHighlighter(BertForTokenClassification):
             # position_ids=position_ids,
             # head_mask=head_mask,
             # inputs_emb:eds=inputs_embeds,
-            # output_attentions=output_attentions,
-            # output_hidden_states=output_hidden_states,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
 
@@ -82,8 +108,12 @@ class AggHighlighter(BertForTokenClassification):
             # not so sure if this can turn right back to the original shape
             loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1)).view(labels.shape)
             # loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1)) # this flatten all losses from all tokens into one scalar
-            apply_weights = torch.matmul(input_dict['aggregation'], self.agg_weights)
+            agg_type_tensor = aggregation.type_as(self.agg_weights)
+            apply_weights = torch.matmul(agg_type_tensor, self.agg_weights)
             weighted_loss = apply_weights * loss.sum(dim=1)
+            weighted_loss = weighted_loss.mean() # mean all losses in the batch
+            # I decided to use mean accroding to this link: https://discuss.pytorch.org/t/loss-reduction-sum-vs-mean-when-to-use-each/115641/2
+            # "the disadvantage in using the sum reduction would also be that the loss scale (and gradients) depend on the batch size, so you would probably need to change the learning rate based on the batch size."
 
         return TokenClassifierOutput(
                 loss=weighted_loss, 
