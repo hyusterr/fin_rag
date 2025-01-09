@@ -83,11 +83,37 @@ def tokenize_and_align_labels(examples):
     return tokenized_inputs
 
 
-
 seqeval = evaluate.load("seqeval")
 label_list = ['0', '1']
-def compute_metrics(p):
+'''
+def postprocess(predictions, labels):
+    predictions = predictions.detach().cpu().clone().numpy()
+    labels = labels.detach().cpu().clone().numpy()
+
+    # Remove ignored index (special tokens) and convert to labels
+    true_labels = [[label_list[l] for l in label if l != -100] for label in labels]
+    true_predictions = [
+        [label_names[p] for (p, l) in zip(prediction, label) if l != -100]
+        for prediction, label in zip(predictions, labels)
+    ]
+    return true_labels, true_predictions
+'''
+
+def compute_metrics(p, compute_result=False):
+
+    # print(type(p))
+    '''
+    if compute_result:
+        #  When set to True, you must pass a compute_metrics function that takes a boolean argument compute_result, which when passed True, will trigger the final global summary statistics from the batch-level summary statistics you’ve accumulated over the evaluation set.
+        print(p)
+        # return p
+    '''
+
     predictions, labels = p
+    # print(len(predictions))
+    # print(predictions[0])
+    # predictions = predictions[0].detach().cpu().clone().numpy()
+    # labels = labels.detach().cpu().clone().numpy()
     predictions = np.argmax(predictions, axis=2)
 
     true_predictions = [
@@ -175,19 +201,20 @@ highlight_dataset = DatasetDict({'train': train_dataset, 'test': expert_dataset}
 tokenized_datasets = highlight_dataset.map(tokenize_and_align_labels, batched=True)
 
 # train_dataset.set_format(type='torch')
-print(tokenized_datasets['train'][0])
+# print(tokenized_datasets['train'][0])
 # collate_fn: input a list of samples from the dataset and collate them into a batch of data
 data_collator = AggDataCollatorForTokenClassification(tokenizer=tokenizer)
-train_dataloader = DataLoader(tokenized_datasets['train'], batch_size=16, shuffle=True, collate_fn=data_collator)
-instance = next(iter(train_dataloader))
-print(instance)
+# train_dataloader = DataLoader(tokenized_datasets['train'], batch_size=16, shuffle=True, collate_fn=data_collator)
+# instance = next(iter(train_dataloader))
+# print(instance)
 
 # model = AutoModelForTokenClassification.from_pretrained("bert-base-uncased", num_labels=2)
 
 model = AggHighlighter()
-print(model(instance))
+# print(model(instance))
 
-'''
+# https://discuss.huggingface.co/t/indexerror-invalid-key-16-is-out-of-bounds-for-size-0/14298/11
+# that's why sometimes I don't like the huggingface's API, it's not clear and not easy to debug
 training_args = TrainingArguments(
     output_dir="checkpoints/agg_highlight",
     learning_rate=2e-5,
@@ -198,21 +225,18 @@ training_args = TrainingArguments(
     eval_strategy="epoch",
     save_strategy="epoch",
     load_best_model_at_end=True,
+    remove_unused_columns=False,
+    # batch_eval_metrics=True,
+    # eval_do_concat_batches=False, # trainer by default will concatenate the batches before the evaluation, leads to torch.cat error
+    # dispatch_batches=True # another weird bug: https://github.com/huggingface/transformers/issues/26548 
 )
-print(tokenized_datasets['train'])
-print(type(tokenized_datasets['train']))
-print(len(tokenized_datasets['train']))
-tokenized_datasets['train'].set_format(type='torch')
-train_dataloader = DataLoader(
-        tokenized_datasets['train'].remove_columns(tokenized_datasets["train"].column_names), shuffle=True, collate_fn=data_collator, batch_size=training_args.per_device_train_batch_size
-    )
-print(tokenized_datasets['train'][0])
-print(next(iter(train_dataloader)))
-print(model(next(iter(train_dataloader))))
+# there is a very weird behavior in trainer, it will collect all kinds of outputs from the model, including logits, hidden states, attentions, etc. batch by batch
+# and then concatenate them, which will lead to the error: `RuntimeError: Sizes of tensors must match except in dimension 0. Got 16 and 0 in dimension 1` since the criterion to decide if it is need to adjust padding size is tensor.shape[1] are all the same.
+# but the shape[1] of attentions are all the same (12=layers), so it will raise the error when concatenate them directly...
 
-'''
-'''
 # about specify devices: https://github.com/huggingface/transformers/issues/12570#issuecomment-876009872
+# "If you have multiple GPUs available, the Trainer will use all of them, that is expected and not a bug."
+# `CUDA_VISIBLE_DEVICES=2 python main.py...` to specify the GPU
 trainer = Trainer(
     model=model,
     args=training_args,
@@ -223,6 +247,5 @@ trainer = Trainer(
     compute_metrics=compute_metrics,
     callbacks = [EarlyStoppingCallback(early_stopping_patience=5)]
 )
-
-trainer.train()
-'''
+# trainer.evaluate(ignore_keys=['attentions', 'hidden_states'])
+trainer.train(ignore_keys_for_eval=['attentions', 'hidden_states'])

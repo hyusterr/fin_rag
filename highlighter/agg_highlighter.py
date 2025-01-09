@@ -31,11 +31,11 @@ class AggHighlighterDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.data)
 '''
-
+# KEYS_TO_IGNORE_AT_INFERENCE = ['attentions', 'hidden_states']
 class AggHighlighter(BertForTokenClassification):
     def __init__(self, config=None, agg_weights_base=0.9):
         if config is None:
-            config = BertConfig.from_pretrained('bert-base-uncased', num_labels=2)
+            config = BertConfig.from_pretrained('bert-base-uncased', num_labels=2) # keys_to_ignore_at_inference=KEYS_TO_IGNORE_AT_INFERENCE)
         super(AggHighlighter, self).__init__(config)
         # self.agg_weights = agg_weights
         self.agg_weights = torch.tensor([
@@ -45,10 +45,6 @@ class AggHighlighter(BertForTokenClassification):
             agg_weights_base**3 * 1,
             agg_weights_base**4 * 1,
         ])
-        print(self.agg_weights)
-        print(self.device)
-
-
 
     def forward(
             self, 
@@ -114,6 +110,8 @@ class AggHighlighter(BertForTokenClassification):
             weighted_loss = weighted_loss.mean() # mean all losses in the batch
             # I decided to use mean accroding to this link: https://discuss.pytorch.org/t/loss-reduction-sum-vs-mean-when-to-use-each/115641/2
             # "the disadvantage in using the sum reduction would also be that the loss scale (and gradients) depend on the batch size, so you would probably need to change the learning rate based on the batch size."
+
+        # print(logits.shape)
 
         return TokenClassifierOutput(
                 loss=weighted_loss, 
