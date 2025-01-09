@@ -36,6 +36,7 @@ class AggHighlighter(BertForTokenClassification):
     def __init__(self): #, config): #agg_weights):
         super(AggHighlighter, self).__init__(BertConfig.from_pretrained('bert-base-uncased', num_labels=2))
         # self.agg_weights = agg_weights
+        self.agg_weights = torch.tensor([5, 4, 3, 2, 1])
 
 
 
@@ -44,24 +45,51 @@ class AggHighlighter(BertForTokenClassification):
         input_ids = input_dict['input_ids']
         attention_mask = input_dict['attention_mask'] if 'attention_mask' in input_dict else None
         labels = input_dict['labels'] if 'labels' in input_dict else None
+        token_type_ids = input_dict['token_type_ids'] if 'token_type_ids' in input_dict else None
+        # return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        return_dict = True
 
-        '''
-        original_outputs = super(AggHighlighter, self).forward(
-            input_ids=input_ids,
+        outputs = self.bert(
+            input_ids,
             attention_mask=attention_mask,
-            labels=labels
+            token_type_ids=token_type_ids,
+            # position_ids=position_ids,
+            # head_mask=head_mask,
+            # inputs_emb:eds=inputs_embeds,
+            # output_attentions=output_attentions,
+            # output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
         )
-        print(original_outputs.loss) # original_outputs.loss will output a scalar tensor
-        '''
-        agg_type = input_dict['aggregation'] # one hot encoding
-        # weighted_loss = original_outputs.loss * self.agg_weights[agg_type]
-        stophere
+
+        sequence_output = outputs[0]
+        logits = self.classifier(sequence_output)
+        loss = None
+        if labels is not None:
+            loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
+            # Only keep active parts of the loss
+            '''
+            if attention_mask is not None:
+                # not sure if this will be used in the future (consider RAG)
+                active_loss = attention_mask.view(-1) == 1
+                active_logits = logits.view(-1, self.num_labels)
+                active_labels = torch.where(
+                    active_loss, labels.view(-1), torch.tensor(loss_fct.ignore_index).type_as(labels)
+                )
+                loss = loss_fct(active_logits, active_labels)
+            '''
+            
+            # keep the loss with the same shape as the input
+            # not so sure if this can turn right back to the original shape
+            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1)).view(labels.shape)
+            # loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1)) # this flatten all losses from all tokens into one scalar
+            apply_weights = torch.matmul(input_dict['aggregation'], self.agg_weights)
+            weighted_loss = apply_weights * loss.sum(dim=1)
 
         return TokenClassifierOutput(
                 loss=weighted_loss, 
-                logits=original_outputs.logits,
-                hidden_states=original_outputs.hidden_states,
-                attentions=original_outputs.attentions
+                logits=logits,
+                hidden_states=outputs.hidden_states,
+                attentions=outputs.attentions
             )
 
 
