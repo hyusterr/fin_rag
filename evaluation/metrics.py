@@ -55,8 +55,20 @@ def get_auc(pred, truth):
     auc = roc_auc_score(truth, pred)
     return auc
 
+def get_f1(pred, truth):
+    """
+    Evaluate the F1.
+    - pred: list of predictions, e.g. [0, 1, 0, ...]
+    - truth: list of truth, e.g. [0, 1, 0, ...]
+    """
+    tp = sum([1 for p, t in zip(pred, truth) if p == 1 and t == 1])
+    fp = sum([1 for p, t in zip(pred, truth) if p == 1 and t == 0])
+    fn = sum([1 for p, t in zip(pred, truth) if p == 0 and t == 1])
+    f1 = 2 * tp / (2 * tp + fp + fn) if tp + fp + fn > 0 else 0
+    return f1
 
-def evaluate_a_pair_highlight(pred, truth): #, pred_threshold=0.5) -> dict:
+
+def evaluate_a_pair_highlight(pred, truth, agg_type='naive_aggregation'): #, pred_threshold=0.5) -> dict:
     """
     Evaluate a pair of predictions and truth.
     - pred: prediction after average of different ref-tgt pair dict, e.g. {
@@ -90,8 +102,12 @@ def evaluate_a_pair_highlight(pred, truth): #, pred_threshold=0.5) -> dict:
     pred_bin = pred["words_label_tgt_smooth"]
     pred_prob = pred["words_probs_tgt_mean"]
 
-    truth_bin = truth["highlight_labels"]
-    truth_prob = truth["highlight_probs"]
+    try:
+        truth_bin = truth["binary_labels"] # for expert set
+        truth_prob = truth["binary_labels"] # we only have one expert, so the truth_prob is the same as truth_bin
+    except:
+        truth_bin = truth[agg_type]["highlight_labels"]
+        truth_prob = truth["highlight_probs"]
     # Calculate the R-Precision
     r_precision = get_r_precision(pred_prob, truth_bin)
 
@@ -110,15 +126,23 @@ def evaluate_a_pair_highlight(pred, truth): #, pred_threshold=0.5) -> dict:
     else:
         auc = get_auc(pred_prob, truth_bin)
 
+    # rouge seems non-sense for this task, skip it for now
+    '''
     # calculate ROUGEs
     # pred_tokens = [truth["tokens"][i] for i, p in enumerate(pred_bin) if p == 1] 
     pred_tokens = pred["highlight_spans_smooth"]
     # TODO: do we need to consider splitting into spans considering the consecutive tokens? now is the simpliest version
     # TODO: the evaluate shall support some parallel processing, maybe not count at every single pair will be faster
-    ref_tokens = " ".join(truth["highlight_spans"])
+    try:
+        ref_tokens = " ".join(truth["highlight_spans"]) # it seems like this will be wrong when there are multiple spans
+        # I have not yet prepare spans for the expert set
+
+    except:
+        ref_tokens = " ".join(truth[agg_type]["spans"]) # it seems like this will be wrong when there are multiple spans
     pred_tokens = " ".join(pred_tokens)
     # TODO: rouge implement batch inside, the efficiency has not yet been leveraged
     rouges = rouge.compute(predictions=[pred_tokens], references=[ref_tokens])
+    '''
     
     
     # Return the metrics
@@ -134,7 +158,7 @@ def evaluate_a_pair_highlight(pred, truth): #, pred_threshold=0.5) -> dict:
         "correlation": correlation,
         "auc": auc,
     }
-    output.update(rouges)
+    # output.update(rouges)
 
     # print(output)
 

@@ -18,6 +18,12 @@ def read_jsonl(file_path):
             data.append(json.loads(line))
     return data
 
+def prepare_torch_data(data_dict, tokenizer):
+    ''' Prepare the data for torch model '''
+    # Convert the data into a list of dictionaries
+    pass
+
+
 def aggregate_and_index_all_prior(cik, form, start_year, end_year):
     # Define the index name and path
     index_name = f"up_to_{end_year}_{form}_{cik}"

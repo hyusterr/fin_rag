@@ -241,6 +241,9 @@ def evaluate_annotation(annotation_files):
         # span-level agreement
         annotator_pairs = list(permutations(range(len(annotators)), 2))
         span_level_agreement = []
+        num_of_pairs = 0
+        eval_per_annotator = defaultdict(defaultdict(list))
+        this_paragraph_metrics = defaultdict(list)
         for a1, a2 in annotator_pairs:
             # List of List[int]
             span1_ids = sample_from_annotators[a1]['span_ids']
@@ -250,17 +253,20 @@ def evaluate_annotation(annotation_files):
                 continue
 
             else:
+                num_of_pairs += 1
                 this_paragraph_metrics = defaultdict(list)
                 span_a1_agreements = evaluate_span_agreement(span1_ids, span2_ids)
                 # the annotation-level: one annotator-span has one result
-                for res in span_a1_agreements:
+                for res in span_a1_agreements: # for (a1, a2) pair 
                     for key, value in res.items():
-                        this_paragraph_metrics[key].append(value)
+                        # this_paragraph_metrics[key].append(value)
+                        eval_per_annotator[a1][key].append(value)
 
                 for key, value in this_paragraph_metrics.items():
                     inter_annotator_metrics[key].append(np.nanmean(value))
 
-                span_level_agreement += span_a1_agreements
+                # span_level_agreement += span_a1_agreements
+
         
 
         # iterate over sample
@@ -353,6 +359,19 @@ def evaluate_annotation(annotation_files):
     # Krippendorff alpha on topic
 
     # intra-annotator agreement
+
+def evaluate_with_expert(aggregated_file, expert_file):
+    with open(aggregated_file, 'r') as f:
+        aggregate_file = read_jsonl(f)
+
+    with open(expert_file, 'r') as f:
+        expert_file = read_jsonl(f)
+
+    aggregate_annotations = {a['sample_id']: a for a in aggregate_file}
+    for sample in expert_file:
+
+
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

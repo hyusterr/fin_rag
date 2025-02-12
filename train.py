@@ -197,7 +197,7 @@ class AggDataCollatorForTokenClassification(DataCollatorForTokenClassification):
 train_dataset = Dataset.from_generator(data_generator_mix_all, gen_kwargs={'data_list': train_data})
 test_dataset = Dataset.from_generator(data_generator_mix_all, gen_kwargs={'data_list': test_data})
 expert_dataset = Dataset.from_generator(data_generator_expert, gen_kwargs={'data_list': expert_data})
-highlight_dataset = DatasetDict({'train': train_dataset, 'test': expert_dataset})
+highlight_dataset = DatasetDict({'train': train_dataset, 'valid': test_dataset, 'test': expert_dataset})
 tokenized_datasets = highlight_dataset.map(tokenize_and_align_labels, batched=True)
 
 # train_dataset.set_format(type='torch')
@@ -216,7 +216,7 @@ model = AggHighlighter()
 # https://discuss.huggingface.co/t/indexerror-invalid-key-16-is-out-of-bounds-for-size-0/14298/11
 # that's why sometimes I don't like the huggingface's API, it's not clear and not easy to debug
 training_args = TrainingArguments(
-    output_dir="checkpoints/agg_highlight",
+    output_dir="checkpoints/agg_highlight_naive",
     learning_rate=2e-5,
     per_device_train_batch_size=16,
     per_device_eval_batch_size=16,
@@ -226,6 +226,7 @@ training_args = TrainingArguments(
     save_strategy="epoch",
     load_best_model_at_end=True,
     remove_unused_columns=False,
+    metric_for_best_model='eval_valid_loss',
     # batch_eval_metrics=True,
     # eval_do_concat_batches=False, # trainer by default will concatenate the batches before the evaluation, leads to torch.cat error
     # dispatch_batches=True # another weird bug: https://github.com/huggingface/transformers/issues/26548 
@@ -241,11 +242,12 @@ trainer = Trainer(
     model=model,
     args=training_args,
     train_dataset=tokenized_datasets["train"],
-    eval_dataset=tokenized_datasets["test"],
+    eval_dataset={'valid': tokenized_datasets["valid"], 'test': tokenized_datasets["test"]},
     # processing_class=tokenizer,
     data_collator=data_collator,
     compute_metrics=compute_metrics,
-    callbacks = [EarlyStoppingCallback(early_stopping_patience=5)]
+    callbacks = [EarlyStoppingCallback(early_stopping_patience=5)],
 )
 # trainer.evaluate(ignore_keys=['attentions', 'hidden_states'])
 trainer.train(ignore_keys_for_eval=['attentions', 'hidden_states'])
+# trainer.evaluate(trainer.train_dataset, ignore_keys=['attentions', 'hidden_states'])

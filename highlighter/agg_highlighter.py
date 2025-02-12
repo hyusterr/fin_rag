@@ -33,18 +33,20 @@ class AggHighlighterDataset(torch.utils.data.Dataset):
 '''
 # KEYS_TO_IGNORE_AT_INFERENCE = ['attentions', 'hidden_states']
 class AggHighlighter(BertForTokenClassification):
-    def __init__(self, config=None, agg_weights_base=0.9):
+    def __init__(self, config=None, agg_weights_base=0.7):
         if config is None:
             config = BertConfig.from_pretrained('bert-base-uncased', num_labels=2) # keys_to_ignore_at_inference=KEYS_TO_IGNORE_AT_INFERENCE)
         super(AggHighlighter, self).__init__(config)
         # self.agg_weights = agg_weights
+        '''
         self.agg_weights = torch.tensor([
-            1,
-            agg_weights_base * 1,
-            agg_weights_base**2 * 1,
-            agg_weights_base**3 * 1,
-            agg_weights_base**4 * 1,
+            0.,
+            0., # agg_weights_base * 1,
+            0., #vagg_weights_base**2 * 1,
+            1., # agg_weights_base**3 * 1,
+            0., # agg_weights_base**4 * 1,
         ])
+        '''
 
     def forward(
             self, 
@@ -87,7 +89,7 @@ class AggHighlighter(BertForTokenClassification):
         logits = self.classifier(sequence_output)
         loss = None
         if labels is not None:
-            loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
+            loss_fct = torch.nn.CrossEntropyLoss(reduction='none') # weight=torch.tensor([1., 4.]).to(self.device))
             # Only keep active parts of the loss
             '''
             if attention_mask is not None:
