@@ -38,7 +38,6 @@ class AggHighlighter(BertForTokenClassification):
             config = BertConfig.from_pretrained('bert-base-uncased', num_labels=2) # keys_to_ignore_at_inference=KEYS_TO_IGNORE_AT_INFERENCE)
         super(AggHighlighter, self).__init__(config)
         # self.agg_weights = agg_weights
-        '''
         self.agg_weights = torch.tensor([
             0.,
             0., # agg_weights_base * 1,
@@ -46,7 +45,6 @@ class AggHighlighter(BertForTokenClassification):
             1., # agg_weights_base**3 * 1,
             0., # agg_weights_base**4 * 1,
         ])
-        '''
 
     def forward(
             self, 
@@ -57,7 +55,8 @@ class AggHighlighter(BertForTokenClassification):
             position_ids=None,
             head_mask=None,
             inputs_embeds=None,
-            aggregation=None
+            aggregation=None,
+            tokens=None,
         ):
 
         if self.agg_weights.device != self.device:
@@ -89,7 +88,7 @@ class AggHighlighter(BertForTokenClassification):
         logits = self.classifier(sequence_output)
         loss = None
         if labels is not None:
-            loss_fct = torch.nn.CrossEntropyLoss(reduction='none') # weight=torch.tensor([1., 4.]).to(self.device))
+            loss_fct = torch.nn.CrossEntropyLoss()# reduction='none') # weight=torch.tensor([1., 4.]).to(self.device))
             # Only keep active parts of the loss
             '''
             if attention_mask is not None:
@@ -104,19 +103,21 @@ class AggHighlighter(BertForTokenClassification):
             
             # keep the loss with the same shape as the input
             # not so sure if this can turn right back to the original shape
-            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1)).view(labels.shape)
+            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
             # loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1)) # this flatten all losses from all tokens into one scalar
+            '''
             agg_type_tensor = aggregation.type_as(self.agg_weights)
             apply_weights = torch.matmul(agg_type_tensor, self.agg_weights)
             weighted_loss = apply_weights * loss.sum(dim=1)
             weighted_loss = weighted_loss.mean() # mean all losses in the batch
+            '''
             # I decided to use mean accroding to this link: https://discuss.pytorch.org/t/loss-reduction-sum-vs-mean-when-to-use-each/115641/2
             # "the disadvantage in using the sum reduction would also be that the loss scale (and gradients) depend on the batch size, so you would probably need to change the learning rate based on the batch size."
 
         # print(logits.shape)
 
         return TokenClassifierOutput(
-                loss=weighted_loss, 
+                loss=loss, # weighted_loss, 
                 logits=logits,
                 hidden_states=outputs.hidden_states,
                 attentions=outputs.attentions
