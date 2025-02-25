@@ -79,7 +79,9 @@ def tokenize_and_align_labels(examples):
                 label_ids.append(-100) # for torch.nn.CrossEntropyLoss, ignore_index=-100 by default
             elif label[word_idx] is None: # for null in strict_aggregation
                 label_ids.append(-100) 
+
             # elif word_idx != previous_word_idx:  # Only label the first token of a given word. if the second subword is lablled will cause ...? 
+            # [NOTE] for now, do not abadon the label from the second subword, just follow what YH's code does
             else:
                 label_ids.append(label[word_idx])
             '''
@@ -208,10 +210,14 @@ class AggDataCollatorForTokenClassification(DataCollatorForTokenClassification):
         
 
 
+import os
+os.environ["WANDB_PROJECT"]="fin.highlight"
+import wandb
+wandb.login()
 for agg_type in ['strict', 'complex', 'harsh', 'naive', 'loose']:
     print('[START] training for', agg_type)
     train_dataset = Dataset.from_generator(data_generator_mix_all, gen_kwargs={'data_list': train_data, 'aggregation_labels': [f'{agg_type}_aggregation']})
-    test_dataset = Dataset.from_generator(data_generator_mix_all, gen_kwargs={'data_list': test_data, 'aggregation_labels': [f'{agg_type}_aggregation']})
+    test_dataset = Dataset.from_generator(data_generator_mix_all, gen_kwargs={'data_list': test_data, 'aggregation_labels': [f'naive_aggregation']})
     expert_dataset = Dataset.from_generator(data_generator_expert, gen_kwargs={'data_list': expert_data})
     highlight_dataset = DatasetDict({'train': train_dataset, 'valid': test_dataset, 'test': expert_dataset})
     tokenized_datasets = highlight_dataset.map(tokenize_and_align_labels, batched=True)
@@ -234,8 +240,8 @@ for agg_type in ['strict', 'complex', 'harsh', 'naive', 'loose']:
     # https://discuss.huggingface.co/t/indexerror-invalid-key-16-is-out-of-bounds-for-size-0/14298/11
     # that's why sometimes I don't like the huggingface's API, it's not clear and not easy to debug
     training_args = TrainingArguments(
-        output_dir=f"checkpoints/agg_highlight_{agg_type}",
-        run_name=f"agg_highlight_{agg_type}",
+        output_dir=f"checkpoints/agg_highlight_{agg_type}_naive_valid",
+        run_name=f"agg_highlight_{agg_type}_naive_valid",
         learning_rate=2e-5,
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
@@ -246,6 +252,7 @@ for agg_type in ['strict', 'complex', 'harsh', 'naive', 'loose']:
         save_strategy="epoch",
         load_best_model_at_end=True,
         remove_unused_columns=False,
+        report_to="wandb",
         metric_for_best_model='valid_f1',
         greater_is_better=True,
         # batch_eval_metrics=True,
@@ -288,4 +295,5 @@ for agg_type in ['strict', 'complex', 'harsh', 'naive', 'loose']:
     print('expert prediction after', expert_pred_after_train)
     # trainer.evaluate(trainer.train_dataset, ignore_keys=['attentions', 'hidden_states'])
     print('[FINISH] training for', agg_type)
+    wandb.finish()
     print('=====================')
