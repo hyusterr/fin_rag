@@ -7,7 +7,128 @@ from deepeval.metrics import ContextualRelevancyMetric
 from deepeval.test_case import LLMTestCase
 from deepeval import evaluate as evaluate_deepeval
 from utils.utils import retrieve_paragraph_from_docid
+from itertools import product
 rouge = evaluate.load("rouge")
+
+
+
+def get_spans_from_binary_labels(labels):
+    '''
+    labels: list of binary labels, e.g. [0, 1, 1, 0, 0, 1, 1, 0, ...]
+    '''
+    spans = []
+    tmp = []
+    for i, l in enumerate(labels):
+        if l == 1:
+            tmp.append(i)
+        else:
+            if tmp != []:
+                spans.append(tmp)
+            tmp = []
+    # deal with the last span
+    if tmp != []:
+        spans.append(tmp)
+    # keep the span as the start and end index
+    spans_start_end = [(s[0], s[-1]) for s in spans]
+    return spans_start_end, spans
+
+def dissimilarity_of_span_pair(span1, span2):
+    '''
+    dissimilarity = positional_dissimilarity + categorical_dissimilarity
+    in our case, categotical dissimilarity is reduced (since we only have 1 highlight category)
+    span1: tuple of start and end index, e.g. (0, 3)
+    span2: tuple of start and end index, e.g. (0, 3)
+    '''
+    pesudo_unit = (-1, -1) 
+    # spirit cost beyond the value of n * pseudo_unit_cost can be discarded
+    associate_cost = 1
+    if span1 == span2:
+        return 0
+
+    if span1 == pesudo_unit or span2 == pesudo_unit:
+        return associate_cost
+
+    pd_numerator = abs(span1[0] - span2[0]) + abs(span1[1] - span2[1])
+    pd_denominator = span1[1] - span1[0] + span2[1] - span2[0]
+    positional_dissimilarity = ((pd_numerator / pd_denominator) ** 2) * associate_cost
+
+    # in our case, we only have 2 categories, so the categorical dissimilarity is 0 or 1
+
+    return positional_dissimilarity
+
+# unitizing: unit locating
+# TODO: keep working on this, this is wrong now
+def disorder_of_a_unitary_alignment(ua):
+    '''
+    - unitary alignment: will ultimately become an n-tuple, (in our case, n = 2 for pred and truth) containing at most one unit by each source: It represents the hypothesis that i source agree to some extent on a given phenomenon to be unitized. If one annotator does not agree, then insert a pseudo-unit for it. e.g. [tok1, tok2, tok3]
+    A: [0, 1, 1]; B: [1, 1, 0] --> tok1: [-1, 1], tok2: [1, 1], tok3: [1, -1]
+    - alignment: is a set of unitary alignments such that each unit of each source belongs to one and only one unitary alignment (so it forms a partition of the sources).
+    - discorder of a unitary aligment: the average of the dissimilarity of all pairs of spans in the unitary alignment
+
+    u: list of spans, e.g. [(0, 3), (4, 6), ...]
+    v: list of spans, e.g. [(0, 3), (4, 6), ...]
+    '''
+    spans_from1 = [s[0] for s in ua if s[1] == 1]
+    spans_from2 = [s[0] for s in ua if s[1] == 2]
+    disorder = np.array([dissimilarity_of_span_pair(pair[0], pair[1]) for pair in product(spans_from1, spans_from2)])
+    return disorder.mean()
+
+
+def disorder_of_an_alignment(a, average_num_of_spans):
+    '''
+    - best alignment: the alignment that minimizes the disorder among all possible alignments
+    - disorder of sources: the disorder of its best alignment
+    a: list of unitary alignments, e.g. [[(0, 3), (4, 6), ...], [(0, 3), (4, 6), ...], ...]
+    '''
+    disorder = 0
+    for ua in a:
+        disorder += disorder_of_a_unitary_alignment(ua)
+    return disorder / average_num_of_spans
+
+def chance_disorder(n=2):
+    '''
+    n: number of sources
+    - chance discorder means if we assume the distribution of 
+        1. number of spans in each source
+        2. highlight labels of each span
+        3. span length per highlighted span (length of label 1)
+        4. gap's length between two highlighted spans (length of label 0)
+    '''
+
+
+def get_observed_disorder(spans_from1, spans_from2):
+    '''
+    spans_from1: list of spans, e.g. [(0, 3), (4, 6), ...]
+    spans_from2: list of spans, e.g. [(0, 3), (4, 6), ...]
+    '''
+    spans_pool = [(s, 1) for s in spans_from1] + [(s, 2) for s in spans_from2] 
+    # get partitions of the spans pool
+    # TODO: need DP or transform it as a linear programming problem
+
+
+
+
+    
+
+def get_holistic_gamma(pred, truth):
+    '''
+    pred: list of predicions, e.g. [0, 1, 0, ...]
+    truth: list of truth, e.g. [0, 1, 0, ...]
+    ref: https://aclanthology.org/J15-3003/
+    Spirits:
+    - any unitary alignment with a cost above ∆∅ can be replaced by creating a separate unitary alignment for each unit (of cost ∆∅ per unitary alignment, so of total cost n · ∆∅).
+    - actually a backpack problem? 
+    '''
+    # get the spans from each prediction
+    pred_spans_start_end, _ = get_spans_from_binary_labels(pred)
+    truth_spans_start_end, _ = get_spans_from_binary_labels(truth)
+    
+    expected_disorder = get_expected_disorder(2)
+    observed_disorder = get_observed_disorder(pred_spans_start_end, truth_spans_start_end)
+    holistic_gamma = 1 - observed_disorder / expected_disorder
+    return holistic_gamma
+
+
 
 def get_r_precision(pred, truth):
     """
@@ -278,3 +399,7 @@ def evaluate_deepeval_context_relevancy(preds, llm, topK=10) -> dict:
     cr_metric = ContextualRelevancyMetric(model=llm)
     evaluate_deepeval(deepeval_testcases, [cr_metric])
 
+if __name__ == "__main__":
+    pred_labels = [0, 1, 1, 0, 0, 1, 1, 0]
+    ref_labels_correct = [0, 1, 1, 0, 0, 1, 1, 0]
+    ref_labels_wrong = [0, 1, 1, 0, 0, 0, 1, 1]
