@@ -1,5 +1,5 @@
 from evaluation.metrics import evaluate_trec_qrels, evaluate_deepeval_context_relevancy
-from evaluation.deepeval import MistralDeepEvalLLM, MISTRAL_7B_INSTRUCT_2
+# from evaluation.deepeval import MistralDeepEvalLLM, MISTRAL_7B_INSTRUCT_2
 
 from pprint import pprint
 

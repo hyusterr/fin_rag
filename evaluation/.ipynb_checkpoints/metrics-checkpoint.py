@@ -1,6 +1,6 @@
 import numpy as np
 import evaluate
-from sklearn.metrics import roc_auc_score, precision_recall_curve, auc, f1_score, precision_score, recall_score, accuracy_score
+from sklearn.metrics import roc_auc_score
 # from trectools.trectools import TrecQrel, TrecRun, TrecEval
 # https://github.com/joaopalotti/trectools
 # from deepeval.metrics import ContextualRelevancyMetric
@@ -110,13 +110,13 @@ def chance_disorder(n=NUM_OF_SOURCE):
     '''
     pass
 
-def get_observed_disorder(pred, truth):
+def get_observed_disorder(reference, prediction):
     '''
     spans_from1: list of spans, e.g. [(0, 3), (4, 6), ...]
     spans_from2: list of spans, e.g. [(0, 3), (4, 6), ...]
     '''
-    spans_from1, _ = get_spans_from_binary_labels(truth)
-    spans_from2, _  = get_spans_from_binary_labels(pred)
+    spans_from1, _ = get_spans_from_binary_labels(prediction)
+    spans_from2, _  = get_spans_from_binary_labels(reference)
     spans_pool = [(s, 1) for s in spans_from1] + [(s, 2) for s in spans_from2] 
     # get partitions of the spans pool
     # TODO: need DP or transform it as a linear programming problem --> use LP for now
@@ -455,83 +455,7 @@ def evaluate_deepeval_context_relevancy(preds, llm, topK=10) -> dict:
     cr_metric = ContextualRelevancyMetric(model=llm)
     evaluate_deepeval(deepeval_testcases, [cr_metric])
 
-def get_auprc(pred_prob, truth):
-    """
-    Evaluate the AUPRC.
-    - pred: list of predictions of probability, e.g. [0.1, 0.9, 0.2, ...]
-    - truth: list of truth, e.g. [0, 1, 0, ...]
-    """
-    precision, recall, _ = precision_recall_curve(truth, pred_prob)
-    auprc = auc(recall, precision)
-    return auprc
-
-def get_r_precision(pred_prob, truth):
-    R = sum(truth)
-    topR_pred_prob = sorted(pred_prob, reverse=True)[:R]
-    r_precision = sum([1 for p in topR_pred_prob if p > 0.5]) / R if R > 0 else 0
-
-
-# it seems like the serial correlation is not suitable for this task, since we only have 1/0 from one expert
-def get_serial_correlation(pred_prob, truth):
-    """
-    Evaluate the serial correlation.
-    - pred: list of predictions of probability, e.g. [0.1, 0.9, 0.2, ...]
-    - truth: list of truth, e.g. [0, 1, 0, ...]
-    """
-    serial_correlation = np.corrcoef(truth[:-1], pred_prob[1:])[0, 1]
-    return serial_correlation
-
-
-def compute_metrics(p): # , compute_result=False):
-    '''
-    p: transformers.EvalPrediction or tuple of predictions and labels
-    - EvalPrediction: utility of transformers, is default output type of Trainer
-    - see: https://github.com/huggingface/transformers/blob/a22a4378d97d06b7a1d9abad6e0086d30fdea199/src/transformers/trainer.py#L365
-    - see also: https://huggingface.co/docs/transformers/internal/trainer_utils#transformers.EvalPrediction
-    '''
-
-    '''
-    if compute_result:
-        #  When set to True, you must pass a compute_metrics function that takes a boolean argument compute_result, which when passed True, will trigger the final global summary statistics from the batch-level summary statistics you’ve accumulated over the evaluation set.
-        print(p)
-        # return p
-    '''
-
-    # label: ground truth, -100 is ignored (special token or ##subword)
-    predictions, labels = p # nd.array
-    predictions_bin = np.argmax(predictions, axis=2)
-    predictions_prob_pos = predictions[:, :, 1]
-
-    
-    true_predictions_bin = [
-        [p for (p, l) in zip(prediction, label) if l != -100]
-        for prediction, label in zip(predictions, labels)
-    ]
-    true_labels = [
-        [l for (p, l) in zip(prediction, label) if l != -100]
-        for prediction, label in zip(predictions, labels)
-    ]
-    true_predictions_prob_pos = [
-        [p for (p, l) in zip(prediction, label) if l != -100]
-        for prediction, label in zip(predictions_prob_pos, labels)
-    ]
-    
-    # do not use seqeval since it's not a NER task
-    f1 = [f1_score(l, p, pos_label=1, average='binary') for l, p in zip(true_labels, true_predictions_bin)]
-    precision = [precision_score(l, p, pos_label=1, average='binary') for l, p in zip(true_labels, true_predictions_bin)]
-    recall = [recall_score(l, p, pos_label=1, average='binary') for l, p in zip(true_labels, true_predictions_bin)]
-    accuracy = [accuracy_score(l, p) for l, p in zip(true_labels, true_predictions_bin)]
-    auprc = [get_auprc(p, l) for l, p in zip(true_predictions_prob_pos, true_labels)]
-    disorder = [get_observed_disorder(p, l) for l, p in zip(true_predictions_bin, true_labels)]
-    r_precision = [get_r_precision(p, l) for l, p in zip(true_predictions_prob_pos, true_labels)]
-
-    return {
-        "f1": np.mean(f1),
-        "precision": np.mean(precision),
-        "recall": np.mean(recall),
-        "accuracy": np.mean(accuracy),
-        "auprc": np.mean(auprc),
-        "disorder": np.mean(disorder),
-        "r_precision": np.mean(r_precision),
-    }
-
+if __name__ == "__main__":
+    pred_labels = [0, 1, 1, 0, 0, 1, 1, 0]
+    ref_labels_correct = [0, 1, 1, 0, 0, 1, 1, 0]
+    ref_labels_wrong = [0, 1, 1, 0, 0, 0, 1, 1]
