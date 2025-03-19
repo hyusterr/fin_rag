@@ -17,12 +17,14 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # load the data
-DATA_DIR = Path('annotation/annotated_result/all/')
-TRAIN_DATA = DATA_DIR / 'aggregate_train.jsonl'
-TEST_DATA = DATA_DIR / 'aggregate_test.jsonl'
-EXPERT_DATA = DATA_DIR / 'expert_annotated_test.jsonl'
+DATA_DIR = Path('annotation/annotated_result/all/setting2/')
+TRAIN_DATA = DATA_DIR / 'train.jsonl'
+VALID_DATA = DATA_DIR / 'valid.jsonl'
+TEST_DATA = DATA_DIR / 'test.jsonl'
+EXPERT_DATA = DATA_DIR / 'expert.jsonl'
 
 train_data = read_jsonl(TRAIN_DATA)
+valid_data = read_jsonl(VALID_DATA)
 test_data = read_jsonl(TEST_DATA)
 expert_data = read_jsonl(EXPERT_DATA)
 
@@ -125,6 +127,10 @@ def compute_metrics(p): # , compute_result=False):
     '''
 
     predictions, labels = p
+    print(type(predictions))
+    print(type(labels))
+    print(predictions.shape)
+    print(labels.shape)
     predictions = np.argmax(predictions, axis=2)
 
     
@@ -217,9 +223,10 @@ wandb.login()
 for agg_type in ['strict', 'complex', 'harsh', 'naive', 'loose']:
     print('[START] training for', agg_type)
     train_dataset = Dataset.from_generator(data_generator_mix_all, gen_kwargs={'data_list': train_data, 'aggregation_labels': [f'{agg_type}_aggregation']})
+    valid_dataset = Dataset.from_generator(data_generator_mix_all, gen_kwargs={'data_list': valid_data, 'aggregation_labels': [f'naive_aggregation']})
     test_dataset = Dataset.from_generator(data_generator_mix_all, gen_kwargs={'data_list': test_data, 'aggregation_labels': [f'naive_aggregation']})
     expert_dataset = Dataset.from_generator(data_generator_expert, gen_kwargs={'data_list': expert_data})
-    highlight_dataset = DatasetDict({'train': train_dataset, 'valid': test_dataset, 'test': expert_dataset})
+    highlight_dataset = DatasetDict({'train': train_dataset, 'valid': valid_dataset, 'test': test_dataset, 'expert': expert_dataset})
     tokenized_datasets = highlight_dataset.map(tokenize_and_align_labels, batched=True)
     data_collator = AggDataCollatorForTokenClassification(tokenizer=tokenizer)
     model = AutoModelForTokenClassification.from_pretrained("bert-base-uncased", num_labels=2, id2label=id2label, label2id=label2id)
@@ -240,8 +247,8 @@ for agg_type in ['strict', 'complex', 'harsh', 'naive', 'loose']:
     # https://discuss.huggingface.co/t/indexerror-invalid-key-16-is-out-of-bounds-for-size-0/14298/11
     # that's why sometimes I don't like the huggingface's API, it's not clear and not easy to debug
     training_args = TrainingArguments(
-        output_dir=f"checkpoints/agg_highlight_{agg_type}_naive_valid",
-        run_name=f"agg_highlight_{agg_type}_naive_valid",
+        output_dir=f"checkpoints/agg_setting2_{agg_type}_naive_valid",
+        run_name=f"agg_setting2_{agg_type}_naive_valid",
         learning_rate=2e-5,
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
@@ -271,7 +278,12 @@ for agg_type in ['strict', 'complex', 'harsh', 'naive', 'loose']:
         model=model,
         args=training_args,
         train_dataset=tokenized_datasets["train"],
-        eval_dataset={'valid': tokenized_datasets["valid"], 'test': tokenized_datasets["test"]},
+        eval_dataset={
+            'train': tokenized_datasets["train"],
+            'valid': tokenized_datasets["valid"], 
+            'test': tokenized_datasets["test"], 
+            'expert': tokenized_datasets["expert"]
+        },
         # processing_class=tokenizer,
         data_collator=data_collator,
         compute_metrics=compute_metrics,
