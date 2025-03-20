@@ -9,6 +9,7 @@ from sklearn.metrics import roc_auc_score, precision_recall_curve, auc, f1_score
 import pulp
 from utils.utils import retrieve_paragraph_from_docid
 from itertools import product
+from scipy.special import softmax
 rouge = evaluate.load("rouge")
 
 
@@ -110,7 +111,7 @@ def chance_disorder(n=NUM_OF_SOURCE):
     '''
     pass
 
-def get_observed_disorder(pred, truth):
+def get_observed_disorder(truth, pred):
     '''
     spans_from1: list of spans, e.g. [(0, 3), (4, 6), ...]
     spans_from2: list of spans, e.g. [(0, 3), (4, 6), ...]
@@ -166,7 +167,7 @@ def get_observed_disorder(pred, truth):
     return best_disorder #, best_alignment
 
 
-def get_holistic_gamma(pred, truth):
+def get_holistic_gamma(truth, pred):
     '''
     pred: list of predicions, e.g. [0, 1, 0, ...]
     truth: list of truth, e.g. [0, 1, 0, ...]
@@ -186,7 +187,7 @@ def get_holistic_gamma(pred, truth):
 
 
 
-def get_r_precision(pred, truth):
+def get_r_precision(truth, pred):
     """
     Evaluate the R-Precision.
     - pred: list of predicted probability, e.g. [0.1, 0.9, 0.2, ...]
@@ -198,23 +199,9 @@ def get_r_precision(pred, truth):
     r_precision = len(set(truth_index) & set(topr_pred_index)) / r_truth if r_truth > 0 else 0
     return r_precision
 
-def get_precision_recall_f1(pred, truth):
-    """
-    Evaluate the precision, recall, and F1.
-    - pred: list of predictions, e.g. [0, 1, 0, ...]
-    - truth: list of truth, e.g. [0, 1, 0, ...]
-    """
-    tp = sum([1 for p, t in zip(pred, truth) if p == 1 and t == 1])
-    fp = sum([1 for p, t in zip(pred, truth) if p == 1 and t == 0])
-    fn = sum([1 for p, t in zip(pred, truth) if p == 0 and t == 1])
-    tn = sum([1 for p, t in zip(pred, truth) if p == 0 and t == 0])
-    precision = tp / (tp + fp) if tp + fp > 0 else 0
-    recall = tp / (tp + fn) if tp + fn > 0 else 0
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
-    return precision, recall, f1
 
-
-def get_correlation(pred, truth):
+# it seems like the serial correlation is not suitable for this task, since we only have 1/0 from one expert
+def get_correlation(truth, pred):
     """
     Evaluate the correlation.
     - pred: list of predictions of probability, e.g. [0.1, 0.9, 0.2, ...]
@@ -222,27 +209,6 @@ def get_correlation(pred, truth):
     """
     correlation = np.corrcoef(truth, pred)[0, 1]
     return correlation
-
-def get_auc(pred, truth):
-    """
-    Evaluate the AUC.
-    - pred: list of predictions of probability, e.g. [0.1, 0.9, 0.2, ...]
-    - truth: list of truth, e.g. [0, 1, 0, ...]
-    """
-    auc = roc_auc_score(truth, pred)
-    return auc
-
-def get_f1(pred, truth):
-    """
-    Evaluate the F1.
-    - pred: list of predictions, e.g. [0, 1, 0, ...]
-    - truth: list of truth, e.g. [0, 1, 0, ...]
-    """
-    tp = sum([1 for p, t in zip(pred, truth) if p == 1 and t == 1])
-    fp = sum([1 for p, t in zip(pred, truth) if p == 1 and t == 0])
-    fn = sum([1 for p, t in zip(pred, truth) if p == 0 and t == 1])
-    f1 = 2 * tp / (2 * tp + fp + fn) if tp + fp + fn > 0 else 0
-    return f1
 
 
 def evaluate_a_pair_highlight(pred, truth, agg_type='naive_aggregation'): #, pred_threshold=0.5) -> dict:
@@ -455,7 +421,7 @@ def evaluate_deepeval_context_relevancy(preds, llm, topK=10) -> dict:
     cr_metric = ContextualRelevancyMetric(model=llm)
     evaluate_deepeval(deepeval_testcases, [cr_metric])
 
-def get_auprc(pred_prob, truth):
+def get_auprc(truth, pred_prob):
     """
     Evaluate the AUPRC.
     - pred: list of predictions of probability, e.g. [0.1, 0.9, 0.2, ...]
@@ -466,20 +432,16 @@ def get_auprc(pred_prob, truth):
     return auprc
 
 def get_r_precision(pred_prob, truth):
+    '''
+    Evaluate the R-Precision.
+    - pred: list of predicted probability, e.g. [0.1, 0.9, 0.2, ...]
+    - truth: list of truth, e.g. [0, 1, 0, ...]
+    '''
     R = sum(truth)
     topR_pred_prob = sorted(pred_prob, reverse=True)[:R]
     r_precision = sum([1 for p in topR_pred_prob if p > 0.5]) / R if R > 0 else 0
+    return r_precision
 
-
-# it seems like the serial correlation is not suitable for this task, since we only have 1/0 from one expert
-def get_serial_correlation(pred_prob, truth):
-    """
-    Evaluate the serial correlation.
-    - pred: list of predictions of probability, e.g. [0.1, 0.9, 0.2, ...]
-    - truth: list of truth, e.g. [0, 1, 0, ...]
-    """
-    serial_correlation = np.corrcoef(truth[:-1], pred_prob[1:])[0, 1]
-    return serial_correlation
 
 
 def compute_metrics(p): # , compute_result=False):
@@ -500,12 +462,14 @@ def compute_metrics(p): # , compute_result=False):
     # label: ground truth, -100 is ignored (special token or ##subword)
     predictions, labels = p # nd.array
     predictions_bin = np.argmax(predictions, axis=2)
-    predictions_prob_pos = predictions[:, :, 1]
+    predictions_prob_pos = softmax(predictions, axis=2)[:, :, 1]
+    # print(predictions_prob_pos[0])
+    # print(labels[0])
 
     
     true_predictions_bin = [
         [p for (p, l) in zip(prediction, label) if l != -100]
-        for prediction, label in zip(predictions, labels)
+        for prediction, label in zip(predictions_bin, labels)
     ]
     true_labels = [
         [l for (p, l) in zip(prediction, label) if l != -100]
@@ -515,15 +479,19 @@ def compute_metrics(p): # , compute_result=False):
         [p for (p, l) in zip(prediction, label) if l != -100]
         for prediction, label in zip(predictions_prob_pos, labels)
     ]
+    # print(true_predictions_prob_pos[0])
+    # print(true_labels[0])
+    # print(true_predictions_bin[0])
     
     # do not use seqeval since it's not a NER task
     f1 = [f1_score(l, p, pos_label=1, average='binary') for l, p in zip(true_labels, true_predictions_bin)]
     precision = [precision_score(l, p, pos_label=1, average='binary') for l, p in zip(true_labels, true_predictions_bin)]
     recall = [recall_score(l, p, pos_label=1, average='binary') for l, p in zip(true_labels, true_predictions_bin)]
     accuracy = [accuracy_score(l, p) for l, p in zip(true_labels, true_predictions_bin)]
-    auprc = [get_auprc(p, l) for l, p in zip(true_predictions_prob_pos, true_labels)]
-    disorder = [get_observed_disorder(p, l) for l, p in zip(true_predictions_bin, true_labels)]
-    r_precision = [get_r_precision(p, l) for l, p in zip(true_predictions_prob_pos, true_labels)]
+    auprc = [get_auprc(l, p) for l, p in zip(true_labels, true_predictions_prob_pos)]
+    disorder = [get_observed_disorder(l, p) for l, p in zip(true_labels, true_predictions_prob_pos)]
+    r_precision = [get_r_precision(p, l) for l, p in zip(true_labels, true_predictions_prob_pos)]
+    correlation = [get_correlation(l, p) for l, p in zip(true_labels, true_predictions_prob_pos)]
 
     return {
         "f1": np.mean(f1),
@@ -533,5 +501,6 @@ def compute_metrics(p): # , compute_result=False):
         "auprc": np.mean(auprc),
         "disorder": np.mean(disorder),
         "r_precision": np.mean(r_precision),
+        # "correlation": np.mean(correlation),
     }
 

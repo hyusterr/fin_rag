@@ -11,7 +11,8 @@ import evaluate
 from pathlib import Path
 import numpy as np
 
-from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
+# from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
+from evaluation.metrics import compute_metrics
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -116,48 +117,6 @@ def postprocess(predictions, labels):
     ]
     return true_labels, true_predictions
 
-def compute_metrics(p): # , compute_result=False):
-
-    # print(type(p))
-    '''
-    if compute_result:
-        #  When set to True, you must pass a compute_metrics function that takes a boolean argument compute_result, which when passed True, will trigger the final global summary statistics from the batch-level summary statistics you’ve accumulated over the evaluation set.
-        print(p)
-        # return p
-    '''
-
-    predictions, labels = p
-    print(type(predictions))
-    print(type(labels))
-    print(predictions.shape)
-    print(labels.shape)
-    predictions = np.argmax(predictions, axis=2)
-
-    
-    true_predictions = [
-        [p for (p, l) in zip(prediction, label) if l != -100]
-        for prediction, label in zip(predictions, labels)
-    ]
-    true_labels = [
-        [l for (p, l) in zip(prediction, label) if l != -100]
-        for prediction, label in zip(predictions, labels)
-    ]
-    
-    # do not use seqeval since it's not a NER task
-    f1 = [f1_score(l, p, pos_label=1, average='binary') for l, p in zip(true_labels, true_predictions)]
-    precision = [precision_score(l, p, pos_label=1, average='binary') for l, p in zip(true_labels, true_predictions)]
-    recall = [recall_score(l, p, pos_label=1, average='binary') for l, p in zip(true_labels, true_predictions)]
-    accuracy = [accuracy_score(l, p) for l, p in zip(true_labels, true_predictions)]
-
-
-
-    return {
-        "f1": np.mean(f1),
-        "precision": np.mean(precision),
-        "recall": np.mean(recall),
-        "accuracy": np.mean(accuracy),
-    }
-
 
 # see: https://github.com/huggingface/transformers/blob/v4.47.1/src/transformers/data/data_collator.py#L288
 # see: https://huggingface.co/docs/transformers/main_classes/data_collator#transformers.DataCollatorForTokenClassification
@@ -220,7 +179,7 @@ import os
 os.environ["WANDB_PROJECT"]="fin.highlight"
 import wandb
 wandb.login()
-for agg_type in ['strict', 'complex', 'harsh', 'naive', 'loose']:
+for agg_type in ['naive', 'complex', 'harsh', 'strict', 'loose']:
     print('[START] training for', agg_type)
     train_dataset = Dataset.from_generator(data_generator_mix_all, gen_kwargs={'data_list': train_data, 'aggregation_labels': [f'{agg_type}_aggregation']})
     valid_dataset = Dataset.from_generator(data_generator_mix_all, gen_kwargs={'data_list': valid_data, 'aggregation_labels': [f'naive_aggregation']})
@@ -260,7 +219,7 @@ for agg_type in ['strict', 'complex', 'harsh', 'naive', 'loose']:
         load_best_model_at_end=True,
         remove_unused_columns=False,
         report_to="wandb",
-        metric_for_best_model='valid_f1',
+        metric_for_best_model='valid_disorder',
         greater_is_better=True,
         # batch_eval_metrics=True,
         # eval_do_concat_batches=False, # trainer by default will concatenate the batches before the evaluation, leads to torch.cat error
