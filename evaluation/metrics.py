@@ -10,6 +10,7 @@ import pulp
 from utils.utils import retrieve_paragraph_from_docid
 from itertools import product
 from scipy.special import softmax
+from tqdm import tqdm
 rouge = evaluate.load("rouge")
 
 
@@ -165,10 +166,11 @@ def get_observed_disorder(truth, pred):
             f"Must_seat_{span}",
         )
     # define solvers
-    # solver = pulp.PULP_CBC_CMD(msg=False, threads=64)
+    solver = pulp.PULP_CBC_CMD(msg=False, threads=32)
     # SCIP, GUROBI, CPLEX are faster
     # solver = pulp.SCIP_PY(msg=False, threads=32)
-    solver = pulp.FSCIP_CMD('/tmp2/yshuang/fin.rag/scip/bin/fscip', msg=False, threads=64)
+    # solver = pulp.FSCIP_CMD('/tmp2/yshuang/fin.rag/scip/bin/fscip', msg=False, threads=32)
+    # solver = pulp.SCIP_CMD('/tmp2/yshuang/fin.rag/scip/bin/scip', msg=False)
     # print('time for setting up the model:', time.time() - start)
     alignment_disorder_model.solve(solver)
     # print('time for solving the model:', time.time() - start)
@@ -513,7 +515,17 @@ def compute_metrics(p): # , compute_result=False):
 
     # disorder = [get_observed_disorder(l, p) for l, p in zip(true_labels, true_predictions_bin)]
     disorder = []
-    for (l, p) in zip(true_labels, true_predictions_bin):
+    for (l, p) in tqdm(zip(true_labels, true_predictions_bin)):
+        '''
+        retry = 0
+        while retry < 3:
+            try:
+                disorder.append(get_observed_disorder(l, p))
+                break
+            except:
+                retry += 1
+                continue
+        '''
         disorder.append(get_observed_disorder(l, p))
 
     return {
