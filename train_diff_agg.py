@@ -219,7 +219,7 @@ for agg_type in ['naive', 'complex', 'harsh', 'strict', 'loose']:
         remove_unused_columns=False,
         report_to="wandb",
         metric_for_best_model='valid_disorder',
-        greater_is_better=True,
+        greater_is_better=False,
         # batch_eval_metrics=True,
         # eval_do_concat_batches=False, # trainer by default will concatenate the batches before the evaluation, leads to torch.cat error
         # dispatch_batches=True # another weird bug: https://github.com/huggingface/transformers/issues/26548 
