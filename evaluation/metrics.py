@@ -427,6 +427,8 @@ def get_auprc(truth, pred_prob):
     - pred: list of predictions of probability, e.g. [0.1, 0.9, 0.2, ...]
     - truth: list of truth, e.g. [0, 1, 0, ...]
     """
+    if len(truth) == 0 or len(set(truth)) == 1:
+        return np.nan
     precision, recall, _ = precision_recall_curve(truth, pred_prob, pos_label=1)
     auprc = auc(recall, precision)
     return auprc
@@ -494,13 +496,13 @@ def compute_metrics(p): # , compute_result=False):
     correlation = [get_correlation(l, p) for l, p in zip(true_labels, true_predictions_prob_pos)]
 
     return {
-        "f1": np.mean(f1),
-        "precision": np.mean(precision),
-        "recall": np.mean(recall),
-        "accuracy": np.mean(accuracy),
-        "auprc": np.mean(auprc),
-        "disorder": np.mean(disorder),
-        "r_precision": np.mean(r_precision),
+        "f1": np.nanmean(f1),
+        "precision": np.nanmean(precision),
+        "recall": np.nanmean(recall),
+        "accuracy": np.nanmean(accuracy),
+        "auprc": np.nanmean(auprc),
+        "disorder": np.nanmean(disorder),
+        "r_precision": np.nanmean(r_precision),
         # "correlation": np.mean(correlation),
     }
 
