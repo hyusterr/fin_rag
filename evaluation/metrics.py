@@ -491,7 +491,7 @@ def compute_metrics(p): # , compute_result=False):
     recall = [recall_score(l, p, pos_label=1, average='binary') for l, p in zip(true_labels, true_predictions_bin)]
     accuracy = [accuracy_score(l, p) for l, p in zip(true_labels, true_predictions_bin)]
     auprc = [get_auprc(l, p) for l, p in zip(true_labels, true_predictions_prob_pos)]
-    disorder = [get_observed_disorder(l, p) for l, p in zip(true_labels, true_predictions_prob_pos)]
+    disorder = [get_observed_disorder(l, p) for l, p in zip(true_labels, true_predictions_bin)]
     r_precision = [get_r_precision(p, l) for l, p in zip(true_labels, true_predictions_prob_pos)]
     correlation = [get_correlation(l, p) for l, p in zip(true_labels, true_predictions_prob_pos)]
 
