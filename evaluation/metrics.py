@@ -427,7 +427,7 @@ def get_auprc(truth, pred_prob):
     - pred: list of predictions of probability, e.g. [0.1, 0.9, 0.2, ...]
     - truth: list of truth, e.g. [0, 1, 0, ...]
     """
-    precision, recall, _ = precision_recall_curve(truth, pred_prob)
+    precision, recall, _ = precision_recall_curve(truth, pred_prob, pos_label=1)
     auprc = auc(recall, precision)
     return auprc
 

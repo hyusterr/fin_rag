@@ -83,14 +83,13 @@ def tokenize_and_align_labels(examples):
             elif label[word_idx] is None: # for null in strict_aggregation
                 label_ids.append(-100) 
 
-            # elif word_idx != previous_word_idx:  # Only label the first token of a given word. if the second subword is lablled will cause ...? 
-            # [NOTE] for now, do not abadon the label from the second subword, just follow what YH's code does
-            else:
+            # [NOTE] for now, do not abadon the label from the second subword, just follow what YH's code does 
+            # [2025.3.20 Change] Follow huggingface's tutorial, abandon the label from the second subword
+            elif word_idx != previous_word_idx:  
+                # Only label the first token of a given word. if the second subword is lablled will cause the output label amount larger than annotated label amount (= number of words)
                 label_ids.append(label[word_idx])
-            '''
-            else:
+            else: # for the second subword
                 label_ids.append(-100)
-            '''
             previous_word_idx = word_idx
         labels.append(label_ids)
 
