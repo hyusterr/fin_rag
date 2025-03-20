@@ -178,7 +178,7 @@ import os
 os.environ["WANDB_PROJECT"]="fin.highlight"
 import wandb
 wandb.login()
-for agg_type in ['naive', 'complex', 'harsh', 'strict', 'loose']:
+for agg_type in ['strict', 'complex', 'harsh', 'naive', 'loose']:
     print('[START] training for', agg_type)
     train_dataset = Dataset.from_generator(data_generator_mix_all, gen_kwargs={'data_list': train_data, 'aggregation_labels': [f'{agg_type}_aggregation']})
     valid_dataset = Dataset.from_generator(data_generator_mix_all, gen_kwargs={'data_list': valid_data, 'aggregation_labels': [f'naive_aggregation']})
@@ -205,8 +205,8 @@ for agg_type in ['naive', 'complex', 'harsh', 'strict', 'loose']:
     # https://discuss.huggingface.co/t/indexerror-invalid-key-16-is-out-of-bounds-for-size-0/14298/11
     # that's why sometimes I don't like the huggingface's API, it's not clear and not easy to debug
     training_args = TrainingArguments(
-        output_dir=f"checkpoints/agg_setting2_{agg_type}_naive_valid",
-        run_name=f"agg_setting2_{agg_type}_naive_valid",
+        output_dir=f"checkpoints/{agg_type}_agg_naive_valid_setting2",
+        run_name=f"{agg_type}_agg_naive_valid[setting2]",
         learning_rate=2e-5,
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
