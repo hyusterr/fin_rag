@@ -130,7 +130,7 @@ def get_observed_disorder(truth, pred):
     max_size_per_ua = n
     avarage_num_of_span = n / NUM_OF_SOURCE
 
-    print('time for getting spans:', time.time() - start)
+    # print('time for getting spans:', time.time() - start)
 
     # get all possible UA
     # TODO: apply filter to decrease the number of UA --> maybe don't need it since n is small in our task
@@ -143,7 +143,7 @@ def get_observed_disorder(truth, pred):
         if disorder <= 1:
             possible_unitary_alignments.append(ua)
             disorder_of_possible_ua.append(disorder)
-    print('time for getting possible_unitary_alignments and filter by disorder:', time.time() - start)
+    # print('time for getting possible_unitary_alignments and filter by disorder:', time.time() - start)
     ua2i_map = {c: i for i, c in enumerate(possible_unitary_alignments)}
     i2ua_map = {v: k for k, v in ua2i_map.items()}
     i2ua_list = list(i2ua_map.keys()) # unitary_alignment # name too long error
@@ -169,9 +169,9 @@ def get_observed_disorder(truth, pred):
     # SCIP, GUROBI, CPLEX are faster
     # solver = pulp.SCIP_PY(msg=False, threads=32)
     solver = pulp.FSCIP_CMD('/tmp2/yshuang/fin.rag/scip/bin/fscip', msg=False, threads=64)
-    print('time for setting up the model:', time.time() - start)
+    # print('time for setting up the model:', time.time() - start)
     alignment_disorder_model.solve(solver)
-    print('time for solving the model:', time.time() - start)
+    # print('time for solving the model:', time.time() - start)
     
     # get the result
     best_alignment = []
