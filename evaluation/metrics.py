@@ -116,6 +116,9 @@ def get_observed_disorder(truth, pred):
     spans_from1: list of spans, e.g. [(0, 3), (4, 6), ...]
     spans_from2: list of spans, e.g. [(0, 3), (4, 6), ...]
     '''
+    import time
+    start = time.time()
+    
     spans_from1, _ = get_spans_from_binary_labels(truth)
     spans_from2, _  = get_spans_from_binary_labels(pred)
     spans_pool = [(s, 1) for s in spans_from1] + [(s, 2) for s in spans_from2] 
@@ -127,40 +130,54 @@ def get_observed_disorder(truth, pred):
     max_size_per_ua = n
     avarage_num_of_span = n / NUM_OF_SOURCE
 
+    print('time for getting spans:', time.time() - start)
+
     # get all possible UA
     # TODO: apply filter to decrease the number of UA --> maybe don't need it since n is small in our task
     # 1. if an disorder(ua) > disorder(span, null), it will not take into consideration
     # 2. if (1, 2) is not taken into consideration, (1, 2, 3) will not also
-    possible_unitary_alignments = [
-        tuple(c) for c in pulp.allcombinations(spans_pool, max_size_per_ua)
-    ]
+    all_unitary_alignments = [tuple(c) for c in pulp.allcombinations(spans_pool, max_size_per_ua)]
+    possible_unitary_alignments, disorder_of_possible_ua = [], []
+    for ua in all_unitary_alignments:
+        disorder = disorder_of_a_unitary_alignment(ua)
+        if disorder <= 1:
+            possible_unitary_alignments.append(ua)
+            disorder_of_possible_ua.append(disorder)
+    print('time for getting possible_unitary_alignments and filter by disorder:', time.time() - start)
+    ua2i_map = {c: i for i, c in enumerate(possible_unitary_alignments)}
+    i2ua_map = {v: k for k, v in ua2i_map.items()}
+    i2ua_list = list(i2ua_map.keys()) # unitary_alignment # name too long error
     # describe the inputs
     x = pulp.LpVariable.dicts(
-        "unitary_alignment", possible_unitary_alignments, lowBound=0, upBound=1, cat=pulp.LpInteger
-    )
+        "ua", i2ua_map.keys(), lowBound=0, upBound=1, cat=pulp.LpInteger
+    ) # unitary_alignment # name too long error
+
     # describe the objectives
     alignment_disorder_model = pulp.LpProblem("alignment_disorder", pulp.LpMinimize)
-    alignment_disorder_model += pulp.lpSum([disorder_of_a_unitary_alignment(ua) * x[ua] for ua in possible_unitary_alignments])
-    # describe the constraints
+    alignment_disorder_model += pulp.lpSum([disorder_of_possible_ua[i] * x[i] for i in i2ua_list])
     alignment_disorder_model += (
-        pulp.lpSum([x[ua] for ua in possible_unitary_alignments]) <= max_size,
-        "Maximum_number_of_ua",
+        pulp.lpSum([x[i] for i in i2ua_list]) <= max_size,
+        "Max_ua", # maxium_number_of_ua
     )
-    # each span should be one and only in one unitary alignment
     for span in spans_pool:
         alignment_disorder_model += (
-            pulp.lpSum([x[ua] for ua in possible_unitary_alignments if span in ua]) == 1,
+            pulp.lpSum([x[i] for i in i2ua_list if span in i2ua_map[i]]) == 1,
             f"Must_seat_{span}",
         )
     # define solvers
-    solver = pulp.apis.PULP_CBC_CMD(msg=False)
+    # solver = pulp.PULP_CBC_CMD(msg=False, threads=64)
+    # SCIP, GUROBI, CPLEX are faster
+    # solver = pulp.SCIP_PY(msg=False, threads=32)
+    solver = pulp.FSCIP_CMD('/tmp2/yshuang/fin.rag/scip/bin/fscip', msg=False, threads=64)
+    print('time for setting up the model:', time.time() - start)
     alignment_disorder_model.solve(solver)
+    print('time for solving the model:', time.time() - start)
     
     # get the result
     best_alignment = []
-    for ua in possible_unitary_alignments:
-        if x[ua].value() == 1.:
-            best_alignment.append(ua)
+    for i in i2ua_list:
+        if x[i].value() == 1.:
+            best_alignment.append(i2ua_map[i])
     
     best_disorder = disorder_of_an_alignment(best_alignment,  avarage_num_of_span)
 
@@ -491,9 +508,13 @@ def compute_metrics(p): # , compute_result=False):
     recall = [recall_score(l, p, pos_label=1, average='binary') for l, p in zip(true_labels, true_predictions_bin)]
     accuracy = [accuracy_score(l, p) for l, p in zip(true_labels, true_predictions_bin)]
     auprc = [get_auprc(l, p) for l, p in zip(true_labels, true_predictions_prob_pos)]
-    disorder = [get_observed_disorder(l, p) for l, p in zip(true_labels, true_predictions_bin)]
     r_precision = [get_r_precision(p, l) for l, p in zip(true_labels, true_predictions_prob_pos)]
     correlation = [get_correlation(l, p) for l, p in zip(true_labels, true_predictions_prob_pos)]
+
+    # disorder = [get_observed_disorder(l, p) for l, p in zip(true_labels, true_predictions_bin)]
+    disorder = []
+    for (l, p) in zip(true_labels, true_predictions_bin):
+        disorder.append(get_observed_disorder(l, p))
 
     return {
         "f1": np.nanmean(f1),
