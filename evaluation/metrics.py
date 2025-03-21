@@ -11,9 +11,10 @@ from utils.utils import retrieve_paragraph_from_docid
 from itertools import product
 from scipy.special import softmax
 from tqdm import tqdm
+import multiprocessing
+import time
+
 rouge = evaluate.load("rouge")
-
-
 
 def get_spans_from_binary_labels(labels):
     '''
@@ -112,7 +113,7 @@ def chance_disorder(n=NUM_OF_SOURCE):
     '''
     pass
 
-def get_observed_disorder(truth, pred):
+def get_observed_disorder(truth, pred, max_size_of_ua=2000):
     '''
     spans_from1: list of spans, e.g. [(0, 3), (4, 6), ...]
     spans_from2: list of spans, e.g. [(0, 3), (4, 6), ...]
@@ -144,6 +145,12 @@ def get_observed_disorder(truth, pred):
         if disorder <= 1:
             possible_unitary_alignments.append(ua)
             disorder_of_possible_ua.append(disorder)
+
+    if len(possible_unitary_alignments) > max_size_of_ua:
+        # possible_unitary_alignments = possible_unitary_alignments[:max_size_of_ua]
+        # disorder_of_possible_ua = disorder_of_possible_ua[:max_size_of_ua]
+        return np.nan
+    # print(len(possible_unitary_alignments)) # [0, 1] * n/2 case will have 10K+ possible unitary alignments, will cause memory error
     # print('time for getting possible_unitary_alignments and filter by disorder:', time.time() - start)
     ua2i_map = {c: i for i, c in enumerate(possible_unitary_alignments)}
     i2ua_map = {v: k for k, v in ua2i_map.items()}
@@ -166,7 +173,8 @@ def get_observed_disorder(truth, pred):
             f"Must_seat_{span}",
         )
     # define solvers
-    solver = pulp.PULP_CBC_CMD(msg=False, threads=32)
+    # [PROBLEM] multi-threading cause deadlock with Trainer
+    solver = pulp.PULP_CBC_CMD(msg=False, threads=32, logPath='/dev/null', timeLimit=30)
     # SCIP, GUROBI, CPLEX are faster
     # solver = pulp.SCIP_PY(msg=False, threads=32)
     # solver = pulp.FSCIP_CMD('/tmp2/yshuang/fin.rag/scip/bin/fscip', msg=False, threads=32)
@@ -184,6 +192,10 @@ def get_observed_disorder(truth, pred):
     best_disorder = disorder_of_an_alignment(best_alignment,  avarage_num_of_span)
 
     return best_disorder #, best_alignment
+
+def get_observed_disorder_in_process(truth, pred, return_dict, idx):
+    disorder = get_observed_disorder(truth, pred)
+    return_dict[idx] = disorder
 
 
 def get_holistic_gamma(truth, pred):
@@ -462,80 +474,3 @@ def get_r_precision(pred_prob, truth):
     topR_pred_prob = sorted(pred_prob, reverse=True)[:R]
     r_precision = sum([1 for p in topR_pred_prob if p > 0.5]) / R if R > 0 else 0
     return r_precision
-
-
-
-def compute_metrics(p): # , compute_result=False):
-    '''
-    p: transformers.EvalPrediction or tuple of predictions and labels
-    - EvalPrediction: utility of transformers, is default output type of Trainer
-    - see: https://github.com/huggingface/transformers/blob/a22a4378d97d06b7a1d9abad6e0086d30fdea199/src/transformers/trainer.py#L365
-    - see also: https://huggingface.co/docs/transformers/internal/trainer_utils#transformers.EvalPrediction
-    '''
-
-    '''
-    if compute_result:
-        #  When set to True, you must pass a compute_metrics function that takes a boolean argument compute_result, which when passed True, will trigger the final global summary statistics from the batch-level summary statistics you’ve accumulated over the evaluation set.
-        print(p)
-        # return p
-    '''
-
-    # label: ground truth, -100 is ignored (special token or ##subword)
-    predictions, labels = p # nd.array
-    predictions_bin = np.argmax(predictions, axis=2)
-    predictions_prob_pos = softmax(predictions, axis=2)[:, :, 1]
-    # print(predictions_prob_pos[0])
-    # print(labels[0])
-
-    
-    true_predictions_bin = [
-        [p for (p, l) in zip(prediction, label) if l != -100]
-        for prediction, label in zip(predictions_bin, labels)
-    ]
-    true_labels = [
-        [l for (p, l) in zip(prediction, label) if l != -100]
-        for prediction, label in zip(predictions, labels)
-    ]
-    true_predictions_prob_pos = [
-        [p for (p, l) in zip(prediction, label) if l != -100]
-        for prediction, label in zip(predictions_prob_pos, labels)
-    ]
-    # print(true_predictions_prob_pos[0])
-    # print(true_labels[0])
-    # print(true_predictions_bin[0])
-    
-    # do not use seqeval since it's not a NER task
-    f1 = [f1_score(l, p, pos_label=1, average='binary') for l, p in zip(true_labels, true_predictions_bin)]
-    precision = [precision_score(l, p, pos_label=1, average='binary') for l, p in zip(true_labels, true_predictions_bin)]
-    recall = [recall_score(l, p, pos_label=1, average='binary') for l, p in zip(true_labels, true_predictions_bin)]
-    accuracy = [accuracy_score(l, p) for l, p in zip(true_labels, true_predictions_bin)]
-    auprc = [get_auprc(l, p) for l, p in zip(true_labels, true_predictions_prob_pos)]
-    r_precision = [get_r_precision(p, l) for l, p in zip(true_labels, true_predictions_prob_pos)]
-    correlation = [get_correlation(l, p) for l, p in zip(true_labels, true_predictions_prob_pos)]
-
-    # disorder = [get_observed_disorder(l, p) for l, p in zip(true_labels, true_predictions_bin)]
-    disorder = []
-    for (l, p) in tqdm(zip(true_labels, true_predictions_bin)):
-        '''
-        retry = 0
-        while retry < 3:
-            try:
-                disorder.append(get_observed_disorder(l, p))
-                break
-            except:
-                retry += 1
-                continue
-        '''
-        disorder.append(get_observed_disorder(l, p))
-
-    return {
-        "f1": np.nanmean(f1),
-        "precision": np.nanmean(precision),
-        "recall": np.nanmean(recall),
-        "accuracy": np.nanmean(accuracy),
-        "auprc": np.nanmean(auprc),
-        "disorder": np.nanmean(disorder),
-        "r_precision": np.nanmean(r_precision),
-        # "correlation": np.mean(correlation),
-    }
-
