@@ -4,6 +4,7 @@ from utils.utils import read_jsonl
 from transformers import BertTokenizer, BertForTokenClassification, BertConfig
 from transformers.modeling_outputs import TokenClassifierOutput
 
+'''
 TRAINING_DATA = 'annotation/annotated_result/all/aggregate_train.jsonl'
 VALID_DATA = 'annotation/annotated_result/all/aggregate_test.jsonl'
 TEST_DATA = 'annotation/annotated_result/all/expert_annotated_test.jsonl'
@@ -11,6 +12,7 @@ TEST_DATA = 'annotation/annotated_result/all/expert_annotated_test.jsonl'
 train_data = read_jsonl(TRAINING_DATA)
 valid_data = read_jsonl(VALID_DATA)
 test_data = read_jsonl(TEST_DATA)
+'''
 
 # option 1: mix all kinds of aggregation and apply different weights and train at the same time
 # option 2: at the beginning, only use one kind of aggregation and then gradually add more, let the model learn from deterministic to soft gradually
