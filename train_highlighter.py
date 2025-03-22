@@ -1,21 +1,34 @@
 import os
 import random
+import warnings
+from pathlib import Path
+from typing import List, Optional
+
 import numpy as np
 import torch
-from tqdm import tqdm
-from pathlib import Path
+import torch.nn.functional as F
 from datasets import Dataset, DatasetDict
+from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
+from tqdm import tqdm
 from transformers import (
     AutoTokenizer,
-    AutoModelForTokenClassification,
     TrainingArguments,
     Trainer,
     EarlyStoppingCallback,
-    set_seed
+    pipeline,
 )
-from scipy.special import softmax
-from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
+import evaluate
 
+# Import your custom modules (adjust the import paths as needed)
+from data_utils import (
+    data_generator_mix_all,
+    data_generator_expert,
+    tokenize_and_align_labels,
+    AggDataCollatorForTokenClassification,
+    read_setting2_data,
+    ID2LABEL,
+    LABEL2ID,
+)
 from evaluation.metrics import (
     get_observed_disorder,
     get_auprc,
@@ -23,46 +36,47 @@ from evaluation.metrics import (
     get_correlation,
 )
 
-import wandb
-
-
-def set_global_seed(seed):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    set_seed(seed)
-    os.environ["PYTHONHASHSEED"] = str(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+# Suppress warnings
+warnings.filterwarnings("ignore")
 
 
 def compute_metrics(p):
-    predictions, labels = p
+    """
+    Compute evaluation metrics for the Trainer.
+    p: (predictions, labels), where predictions is a numpy array.
+    """
+    predictions, labels = p  # predictions: ndarray; labels: ndarray (with -100 indicating ignore)
     predictions_bin = np.argmax(predictions, axis=2)
+    # Compute probabilities with softmax over the last axis
     predictions_prob_pos = softmax(predictions, axis=2)[:, :, 1]
 
+    # Filter out ignored tokens (-100)
     true_predictions_bin = [
-        [p for (p, l) in zip(pred, label) if l != -100]
-        for pred, label in zip(predictions_bin, labels)
+        [pred for (pred, lab) in zip(pred_seq, lab_seq) if lab != -100]
+        for pred_seq, lab_seq in zip(predictions_bin, labels)
     ]
     true_labels = [
-        [l for (p, l) in zip(pred, label) if l != -100]
-        for pred, label in zip(predictions, labels)
+        [lab for lab in lab_seq if lab != -100] for lab_seq in labels
     ]
     true_predictions_prob_pos = [
-        [p for (p, l) in zip(pred, label) if l != -100]
-        for pred, label in zip(predictions_prob_pos, labels)
+        [prob for (prob, lab) in zip(prob_seq, lab_seq) if lab != -100]
+        for prob_seq, lab_seq in zip(predictions_prob_pos, labels)
     ]
 
-    disorder = [get_observed_disorder(l, p) for l, p in tqdm(zip(true_labels, true_predictions_bin))]
+    # Compute the disorder metric for each sequence
+    disorder = []
+    for l, p in tqdm(zip(true_labels, true_predictions_bin), total=len(true_labels), desc="Computing disorder"):
+        disorder.append(get_observed_disorder(l, p))
+    print('Number of NaN disorder:', np.sum(np.isnan(disorder)))
+
+    # Compute standard metrics
     f1 = [f1_score(l, p, pos_label=1, average='binary') for l, p in zip(true_labels, true_predictions_bin)]
     precision = [precision_score(l, p, pos_label=1, average='binary') for l, p in zip(true_labels, true_predictions_bin)]
     recall = [recall_score(l, p, pos_label=1, average='binary') for l, p in zip(true_labels, true_predictions_bin)]
     accuracy = [accuracy_score(l, p) for l, p in zip(true_labels, true_predictions_bin)]
     auprc = [get_auprc(l, p) for l, p in zip(true_labels, true_predictions_prob_pos)]
     r_precision = [get_r_precision(p, l) for l, p in zip(true_labels, true_predictions_prob_pos)]
-    correlation = [get_correlation(l, p) for l, p in zip(true_labels, true_predictions_prob_pos)]
+    # You can also add additional metrics (e.g., correlation) if needed
 
     return {
         "f1": np.nanmean(f1),
@@ -75,114 +89,180 @@ def compute_metrics(p):
     }
 
 
-def run_highlight_experiment(
-    agg_types,
-    train_data,
-    valid_data,
-    test_data,
-    expert_data,
-    tokenizer_path="bert-base-uncased",
-    model_path="bert-base-uncased",
-    tokenizer_fn=None,
-    model_fn=None,
-    aggregation_label_fn=None,
-    train_model=True,
-    output_dir_root="checkpoints",
-    wandb_project="highlight_project",
-    num_train_epochs=20,
-    seed=42,
-    train_agg_types=None,
+def set_global_seed(seed: int):
+    """Set random seed for reproducibility."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+
+def train_highlighter(
+    model,
+    tokenizer,
+    train_agg_types: List[str] = ["naive"],
+    compute_metrics_fn=default_compute_metrics,
+    metric_for_best_model: str = "f1",  # e.g., "valid_f1", "disorder", etc.
+    greater_is_better: bool = True,
+    training_args_kwargs: Optional[dict] = None,
+    train_model: bool = True,
+    seed: int = 42,
+    data_collator: Optional = None,
+    inference_module: Optional[object] = None,
 ):
+    """
+    Train (or run inference) using the HuggingFace Trainer framework.
+
+    Args:
+        model: HuggingFace model instance.
+        tokenizer: HuggingFace tokenizer instance.
+        train_agg_types: List of aggregation types (e.g., ["naive", "loose"]) to be used as training labels.
+        compute_metrics_fn: Function to compute evaluation metrics.
+        metric_for_best_model: Metric used for best model selection.
+        greater_is_better: Whether a higher metric value is better.
+        training_args_kwargs: Dictionary for overriding default TrainingArguments.
+        train_model: If False, skip training and run inference only.
+        seed: Random seed.
+        data_collator: Custom data collator; if None, a default AggDataCollatorForTokenClassification is used.
+        inference_module: Optional module for specialized inference (e.g., attn_highlighter).
+    Returns:
+        If training: the Trainer instance after training.
+        If inference-only: inference outputs.
+    """
+    # Set the random seed for reproducibility
     set_global_seed(seed)
-    os.environ["WANDB_PROJECT"] = wandb_project
-    wandb.login()
 
-    tokenizer = tokenizer_fn(tokenizer_path) if tokenizer_fn else AutoTokenizer.from_pretrained(tokenizer_path)
+    # Load data directly using read_setting2_data()
+    train_data, valid_data, test_data, expert_data = read_setting2_data()
 
-    def default_tokenize_fn(examples):
-        from data_utils import tokenize_and_align_labels
+    # Prepare aggregation labels, e.g., "naive_aggregation", "loose_aggregation", etc.
+    agg_labels = [f"{agg}_aggregation" for agg in train_agg_types]
+    train_dataset = Dataset.from_generator(
+        data_generator_mix_all,
+        gen_kwargs={'data_list': train_data, 'aggregation_labels': agg_labels},
+    )
+    valid_dataset = Dataset.from_generator(
+        data_generator_mix_all,
+        gen_kwargs={'data_list': valid_data, 'aggregation_labels': [agg_labels[0]]},
+    )
+    test_dataset = Dataset.from_generator(
+        data_generator_mix_all,
+        gen_kwargs={'data_list': test_data, 'aggregation_labels': [agg_labels[0]]},
+    )
+    datasets = {"train": train_dataset, "valid": valid_dataset, "test": test_dataset}
+    if expert_data is not None:
+        expert_dataset = Dataset.from_generator(
+            data_generator_expert, gen_kwargs={'data_list': expert_data}
+        )
+        datasets["expert"] = expert_dataset
+    dataset_dict = DatasetDict(datasets)
+
+    # Tokenize and align labels
+    def tokenize_and_align_labels_wrapper(examples):
         return tokenize_and_align_labels(examples, tokenizer=tokenizer)
 
-    tokenize_and_align_labels_wrapper = default_tokenize_fn
+    tokenized_datasets = dataset_dict.map(tokenize_and_align_labels_wrapper, batched=True)
 
-    for agg_type in agg_types:
-        print("[START]", agg_type)
-
-        from data_utils import data_generator_mix_all, data_generator_expert, AggDataCollatorForTokenClassification, ID2LABEL, LABEL2ID
-
-        train_agg_labels = [f"{agg_type}_aggregation"] if not train_agg_types else [f"{t}_aggregation" for t in train_agg_types]
-
-        train_dataset = Dataset.from_generator(
-            data_generator_mix_all,
-            gen_kwargs={"data_list": train_data, "aggregation_labels": train_agg_labels},
-        )
-        valid_dataset = Dataset.from_generator(
-            data_generator_mix_all,
-            gen_kwargs={"data_list": valid_data, "aggregation_labels": ["naive_aggregation"]},
-        )
-        test_dataset = Dataset.from_generator(
-            data_generator_mix_all,
-            gen_kwargs={"data_list": test_data, "aggregation_labels": ["naive_aggregation"]},
-        )
-        expert_dataset = Dataset.from_generator(
-            data_generator_expert, gen_kwargs={"data_list": expert_data}
-        )
-
-        raw_datasets = DatasetDict({
-            "train": train_dataset,
-            "valid": valid_dataset,
-            "test": test_dataset,
-            "expert": expert_dataset,
-        })
-
-        tokenized_datasets = raw_datasets.map(tokenize_and_align_labels_wrapper, batched=True)
+    # Use a default data collator if none is provided
+    if data_collator is None:
         data_collator = AggDataCollatorForTokenClassification(tokenizer=tokenizer)
 
-        if model_fn:
-            model = model_fn()
+    # Set up TrainingArguments with defaults (overridable via training_args_kwargs)
+    training_args_kwargs = training_args_kwargs or {}
+    training_args = TrainingArguments(
+        output_dir=training_args_kwargs.get("output_dir", "checkpoints/highlighter"),
+        run_name=training_args_kwargs.get("run_name", "highlighter_training"),
+        learning_rate=training_args_kwargs.get("learning_rate", 2e-5),
+        per_device_train_batch_size=training_args_kwargs.get("train_batch_size", 16),
+        per_device_eval_batch_size=training_args_kwargs.get("eval_batch_size", 16),
+        num_train_epochs=training_args_kwargs.get("num_train_epochs", 50),
+        weight_decay=training_args_kwargs.get("weight_decay", 0.01),
+        label_names=["labels"],
+        eval_strategy=training_args_kwargs.get("eval_strategy", "epoch"),
+        save_strategy=training_args_kwargs.get("save_strategy", "epoch"),
+        load_best_model_at_end=True,
+        remove_unused_columns=False,
+        report_to=training_args_kwargs.get("report_to", "wandb"),
+        metric_for_best_model=metric_for_best_model,
+        greater_is_better=greater_is_better,
+    )
+
+    # Inference-only mode: skip training and run inference on sample texts.
+    if not train_model:
+        sample_texts = ["This is a sample input text for highlighting inference."]
+        if inference_module is not None:
+            # Expecting the module to have a method `highlighting_outputs`
+            return inference_module.highlighting_outputs(sample_texts)
+        elif hasattr(model, "encode"):
+            return model.encode(sample_texts)
         else:
-            model = AutoModelForTokenClassification.from_pretrained(
-                model_path, num_labels=2, id2label=ID2LABEL, label2id=LABEL2ID
+            # Fallback: use a token-classification pipeline.
+            pipe = pipeline("token-classification", model=model, tokenizer=tokenizer)
+            return pipe(sample_texts)
+
+    # Initialize the Trainer
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=tokenized_datasets["train"],
+        eval_dataset={
+            "train": tokenized_datasets["train"],
+            "valid": tokenized_datasets["valid"],
+            "test": tokenized_datasets["test"],
+            **({"expert": tokenized_datasets["expert"]} if "expert" in tokenized_datasets else {}),
+        },
+        data_collator=data_collator,
+        compute_metrics=compute_metrics_fn,
+        callbacks=[
+            EarlyStoppingCallback(
+                early_stopping_patience=training_args_kwargs.get("early_stopping_patience", 5)
             )
+        ],
+    )
 
-        output_dir = Path(output_dir_root) / f"{agg_type}_agg_naive_valid"
-        training_args = TrainingArguments(
-            output_dir=str(output_dir),
-            run_name=f"{agg_type}_agg_naive_valid",
-            learning_rate=2e-5,
-            per_device_train_batch_size=16,
-            per_device_eval_batch_size=16,
-            num_train_epochs=num_train_epochs,
-            weight_decay=0.01,
-            label_names=['labels'],
-            evaluation_strategy="epoch",
-            save_strategy="epoch",
-            load_best_model_at_end=True,
-            remove_unused_columns=False,
-            report_to="wandb",
-            metric_for_best_model='valid_disorder',
-            greater_is_better=False,
-        )
+    # Train and then evaluate the model
+    trainer.train(ignore_keys_for_eval=["attentions", "hidden_states"])
+    trainer.evaluate(trainer.train_dataset, ignore_keys=["attentions", "hidden_states"])
+    return trainer
 
-        trainer = Trainer(
-            model=model,
-            args=training_args,
-            train_dataset=tokenized_datasets["train"] if train_model else None,
-            eval_dataset={
-                "train": tokenized_datasets["train"],
-                "valid": tokenized_datasets["valid"],
-                "test": tokenized_datasets["test"],
-                "expert": tokenized_datasets["expert"],
-            },
-            data_collator=data_collator,
-            compute_metrics=compute_metrics,
-            callbacks=[EarlyStoppingCallback(early_stopping_patience=5)] if train_model else [],
-        )
 
-        if train_model:
-            trainer.train()
+# ===== Example usage =====
+if __name__ == "__main__":
+    # Load your default model and tokenizer (or plug in any alternative)
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+    from transformers import AutoModelForTokenClassification
+    model = AutoModelForTokenClassification.from_pretrained(
+        "bert-base-uncased",
+        num_labels=2,
+        id2label=ID2LABEL,
+        label2id=LABEL2ID,
+    )
 
-        print("[EVALUATE]", agg_type)
-        trainer.evaluate(tokenized_datasets["test"], ignore_keys=['attentions', 'hidden_states'])
-        wandb.finish()
-        print("[FINISH]", agg_type)
+    # Optionally, you can prepare an inference module (e.g., an attn_highlighter instance)
+    inference_module = None  # Replace with your module instance if needed
+
+    # Call the training function.
+    # Set train_model=False to run in inference-only mode.
+    trainer_obj = train_highlighter(
+        model=model,
+        tokenizer=tokenizer,
+        train_agg_types=["naive", "loose"],
+        metric_for_best_model="f1",
+        greater_is_better=True,
+        training_args_kwargs={
+            "output_dir": "checkpoints/highlighter_example",
+            "run_name": "highlighter_run",
+            "learning_rate": 2e-5,
+            "num_train_epochs": 30,
+            "early_stopping_patience": 5,
+        },
+        train_model=True,  # Change to False for inference-only mode
+        inference_module=inference_module,
+    )
+
+    # If training, trainer_obj is the Trainer instance.
+    print("Training complete.")
+
