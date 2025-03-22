@@ -85,7 +85,8 @@ def disorder_of_a_unitary_alignment(ua):
         spans_from1 = [(-1, -1)]
     if len(spans_from2) == 0:
         spans_from2 = [(-1, -1)]
-        
+    
+    # print(len(spans_from1), len(spans_from2))
     disorder = np.array([dissimilarity_of_span_pair(pair[0], pair[1]) for pair in product(spans_from1, spans_from2)])
     return disorder.mean()
 
@@ -123,6 +124,10 @@ def get_observed_disorder(truth, pred, max_size_of_ua=2000):
     
     spans_from1, _ = get_spans_from_binary_labels(truth)
     spans_from2, _  = get_spans_from_binary_labels(pred)
+    length_of_truth = len(truth)
+    if len(spans_from2) > 20:
+        return np.nan # or 1? 
+    # print('spans from pred:', len(spans_from2))
     spans_pool = [(s, 1) for s in spans_from1] + [(s, 2) for s in spans_from2] 
     # get partitions of the spans pool
     # TODO: need DP or transform it as a linear programming problem --> use LP for now
@@ -138,18 +143,28 @@ def get_observed_disorder(truth, pred, max_size_of_ua=2000):
     # TODO: apply filter to decrease the number of UA --> maybe don't need it since n is small in our task
     # 1. if an disorder(ua) > disorder(span, null), it will not take into consideration
     # 2. if (1, 2) is not taken into consideration, (1, 2, 3) will not also
-    all_unitary_alignments = [tuple(c) for c in pulp.allcombinations(spans_pool, max_size_per_ua)]
+    if len(spans_pool) > 20:
+        return np.nan
+
+    all_unitary_alignments = [tuple(c) for c in pulp.allcombinations(spans_pool, max_size_per_ua) if len(c) < 20]
+    # print('all ua:', len(all_unitary_alignments))
+    if len(all_unitary_alignments) > 500000: 
+        # extreme case --> ignore, not so much, like [0, 1] * n/2; ignore it since with the training progress, case like this will be lesser and lesser
+        return np.nan
     possible_unitary_alignments, disorder_of_possible_ua = [], []
     for ua in all_unitary_alignments:
+        if len(ua) > 20:
+            continue
         disorder = disorder_of_a_unitary_alignment(ua)
         if disorder <= 1:
             possible_unitary_alignments.append(ua)
             disorder_of_possible_ua.append(disorder)
+    # print('possible ua:', len(possible_unitary_alignments))
 
     if len(possible_unitary_alignments) > max_size_of_ua:
-        # possible_unitary_alignments = possible_unitary_alignments[:max_size_of_ua]
-        # disorder_of_possible_ua = disorder_of_possible_ua[:max_size_of_ua]
-        return np.nan
+        possible_unitary_alignments = possible_unitary_alignments[:max_size_of_ua]
+        disorder_of_possible_ua = disorder_of_possible_ua[:max_size_of_ua]
+        # return np.nan
     # print(len(possible_unitary_alignments)) # [0, 1] * n/2 case will have 10K+ possible unitary alignments, will cause memory error
     # print('time for getting possible_unitary_alignments and filter by disorder:', time.time() - start)
     ua2i_map = {c: i for i, c in enumerate(possible_unitary_alignments)}

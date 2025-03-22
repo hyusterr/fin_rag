@@ -81,6 +81,7 @@ def compute_metrics(p):
     disorder = []
     for l, p in tqdm(zip(true_labels, true_predictions_bin)):
         disorder.append(get_observed_disorder(l, p))
+    print('num of nan disorder:', np.sum(np.isnan(disorder)))
         
 
     
@@ -120,7 +121,7 @@ if __name__ == '__main__':
     def tokenize_and_align_labels_wrapper(examples):
         return tokenize_and_align_labels(examples, tokenizer=tokenizer)
 
-    for agg_type in ['strict', 'complex', 'harsh', 'naive', 'loose']:
+    for agg_type in ['naive', 'loose']: # ['strict', 'complex', 'harsh', 'naive', 'loose']:
         print('[START] training for', agg_type)
         train_dataset = Dataset.from_generator(data_generator_mix_all, gen_kwargs={'data_list': train_data, 'aggregation_labels': [f'{agg_type}_aggregation']})
         valid_dataset = Dataset.from_generator(data_generator_mix_all, gen_kwargs={'data_list': valid_data, 'aggregation_labels': [f'naive_aggregation']})

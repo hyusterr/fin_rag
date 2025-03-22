@@ -1,6 +1,6 @@
 import numpy as np
 import evaluate
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, precision_recall_curve, auc, f1_score, precision_score, recall_score, accuracy_score
 # from trectools.trectools import TrecQrel, TrecRun, TrecEval
 # https://github.com/joaopalotti/trectools
 # from deepeval.metrics import ContextualRelevancyMetric
@@ -9,9 +9,12 @@ from sklearn.metrics import roc_auc_score
 import pulp
 from utils.utils import retrieve_paragraph_from_docid
 from itertools import product
+from scipy.special import softmax
+from tqdm import tqdm
+import multiprocessing
+import time
+
 rouge = evaluate.load("rouge")
-
-
 
 def get_spans_from_binary_labels(labels):
     '''
@@ -110,13 +113,16 @@ def chance_disorder(n=NUM_OF_SOURCE):
     '''
     pass
 
-def get_observed_disorder(reference, prediction):
+def get_observed_disorder(truth, pred):
     '''
     spans_from1: list of spans, e.g. [(0, 3), (4, 6), ...]
     spans_from2: list of spans, e.g. [(0, 3), (4, 6), ...]
     '''
-    spans_from1, _ = get_spans_from_binary_labels(prediction)
-    spans_from2, _  = get_spans_from_binary_labels(reference)
+    import time
+    start = time.time()
+    
+    spans_from1, _ = get_spans_from_binary_labels(truth)
+    spans_from2, _  = get_spans_from_binary_labels(pred)
     spans_pool = [(s, 1) for s in spans_from1] + [(s, 2) for s in spans_from2] 
     # get partitions of the spans pool
     # TODO: need DP or transform it as a linear programming problem --> use LP for now
@@ -126,47 +132,67 @@ def get_observed_disorder(reference, prediction):
     max_size_per_ua = n
     avarage_num_of_span = n / NUM_OF_SOURCE
 
+    # print('time for getting spans:', time.time() - start)
+
     # get all possible UA
     # TODO: apply filter to decrease the number of UA --> maybe don't need it since n is small in our task
     # 1. if an disorder(ua) > disorder(span, null), it will not take into consideration
     # 2. if (1, 2) is not taken into consideration, (1, 2, 3) will not also
-    possible_unitary_alignments = [
-        tuple(c) for c in pulp.allcombinations(spans_pool, max_size_per_ua)
-    ]
+    all_unitary_alignments = [tuple(c) for c in pulp.allcombinations(spans_pool, max_size_per_ua)]
+    possible_unitary_alignments, disorder_of_possible_ua = [], []
+    for ua in all_unitary_alignments:
+        disorder = disorder_of_a_unitary_alignment(ua)
+        if disorder <= 1:
+            possible_unitary_alignments.append(ua)
+            disorder_of_possible_ua.append(disorder)
+    # print('time for getting possible_unitary_alignments and filter by disorder:', time.time() - start)
+    ua2i_map = {c: i for i, c in enumerate(possible_unitary_alignments)}
+    i2ua_map = {v: k for k, v in ua2i_map.items()}
+    i2ua_list = list(i2ua_map.keys()) # unitary_alignment # name too long error
     # describe the inputs
     x = pulp.LpVariable.dicts(
-        "unitary_alignment", possible_unitary_alignments, lowBound=0, upBound=1, cat=pulp.LpInteger
-    )
+        "ua", i2ua_map.keys(), lowBound=0, upBound=1, cat=pulp.LpInteger
+    ) # unitary_alignment # name too long error
+
     # describe the objectives
     alignment_disorder_model = pulp.LpProblem("alignment_disorder", pulp.LpMinimize)
-    alignment_disorder_model += pulp.lpSum([disorder_of_a_unitary_alignment(ua) * x[ua] for ua in possible_unitary_alignments])
-    # describe the constraints
+    alignment_disorder_model += pulp.lpSum([disorder_of_possible_ua[i] * x[i] for i in i2ua_list])
     alignment_disorder_model += (
-        pulp.lpSum([x[ua] for ua in possible_unitary_alignments]) <= max_size,
-        "Maximum_number_of_ua",
+        pulp.lpSum([x[i] for i in i2ua_list]) <= max_size,
+        "Max_ua", # maxium_number_of_ua
     )
-    # each span should be one and only in one unitary alignment
     for span in spans_pool:
         alignment_disorder_model += (
-            pulp.lpSum([x[ua] for ua in possible_unitary_alignments if span in ua]) == 1,
+            pulp.lpSum([x[i] for i in i2ua_list if span in i2ua_map[i]]) == 1,
             f"Must_seat_{span}",
         )
     # define solvers
-    solver = pulp.apis.PULP_CBC_CMD(msg=False)
+    # [PROBLEM] multi-threading cause deadlock with Trainer
+    solver = pulp.PULP_CBC_CMD(msg=False, threads=1)
+    # SCIP, GUROBI, CPLEX are faster
+    # solver = pulp.SCIP_PY(msg=False, threads=32)
+    # solver = pulp.FSCIP_CMD('/tmp2/yshuang/fin.rag/scip/bin/fscip', msg=False, threads=32)
+    # solver = pulp.SCIP_CMD('/tmp2/yshuang/fin.rag/scip/bin/scip', msg=False)
+    # print('time for setting up the model:', time.time() - start)
     alignment_disorder_model.solve(solver)
+    # print('time for solving the model:', time.time() - start)
     
     # get the result
     best_alignment = []
-    for ua in possible_unitary_alignments:
-        if x[ua].value() == 1.:
-            best_alignment.append(ua)
+    for i in i2ua_list:
+        if x[i].value() == 1.:
+            best_alignment.append(i2ua_map[i])
     
     best_disorder = disorder_of_an_alignment(best_alignment,  avarage_num_of_span)
 
     return best_disorder #, best_alignment
 
+def get_observed_disorder_in_process(truth, pred, return_dict, idx):
+    disorder = get_observed_disorder(truth, pred)
+    return_dict[idx] = disorder
 
-def get_holistic_gamma(pred, truth):
+
+def get_holistic_gamma(truth, pred):
     '''
     pred: list of predicions, e.g. [0, 1, 0, ...]
     truth: list of truth, e.g. [0, 1, 0, ...]
@@ -186,7 +212,7 @@ def get_holistic_gamma(pred, truth):
 
 
 
-def get_r_precision(pred, truth):
+def get_r_precision(truth, pred):
     """
     Evaluate the R-Precision.
     - pred: list of predicted probability, e.g. [0.1, 0.9, 0.2, ...]
@@ -198,23 +224,9 @@ def get_r_precision(pred, truth):
     r_precision = len(set(truth_index) & set(topr_pred_index)) / r_truth if r_truth > 0 else 0
     return r_precision
 
-def get_precision_recall_f1(pred, truth):
-    """
-    Evaluate the precision, recall, and F1.
-    - pred: list of predictions, e.g. [0, 1, 0, ...]
-    - truth: list of truth, e.g. [0, 1, 0, ...]
-    """
-    tp = sum([1 for p, t in zip(pred, truth) if p == 1 and t == 1])
-    fp = sum([1 for p, t in zip(pred, truth) if p == 1 and t == 0])
-    fn = sum([1 for p, t in zip(pred, truth) if p == 0 and t == 1])
-    tn = sum([1 for p, t in zip(pred, truth) if p == 0 and t == 0])
-    precision = tp / (tp + fp) if tp + fp > 0 else 0
-    recall = tp / (tp + fn) if tp + fn > 0 else 0
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
-    return precision, recall, f1
 
-
-def get_correlation(pred, truth):
+# it seems like the serial correlation is not suitable for this task, since we only have 1/0 from one expert
+def get_correlation(truth, pred):
     """
     Evaluate the correlation.
     - pred: list of predictions of probability, e.g. [0.1, 0.9, 0.2, ...]
@@ -222,27 +234,6 @@ def get_correlation(pred, truth):
     """
     correlation = np.corrcoef(truth, pred)[0, 1]
     return correlation
-
-def get_auc(pred, truth):
-    """
-    Evaluate the AUC.
-    - pred: list of predictions of probability, e.g. [0.1, 0.9, 0.2, ...]
-    - truth: list of truth, e.g. [0, 1, 0, ...]
-    """
-    auc = roc_auc_score(truth, pred)
-    return auc
-
-def get_f1(pred, truth):
-    """
-    Evaluate the F1.
-    - pred: list of predictions, e.g. [0, 1, 0, ...]
-    - truth: list of truth, e.g. [0, 1, 0, ...]
-    """
-    tp = sum([1 for p, t in zip(pred, truth) if p == 1 and t == 1])
-    fp = sum([1 for p, t in zip(pred, truth) if p == 1 and t == 0])
-    fn = sum([1 for p, t in zip(pred, truth) if p == 0 and t == 1])
-    f1 = 2 * tp / (2 * tp + fp + fn) if tp + fp + fn > 0 else 0
-    return f1
 
 
 def evaluate_a_pair_highlight(pred, truth, agg_type='naive_aggregation'): #, pred_threshold=0.5) -> dict:
@@ -455,7 +446,25 @@ def evaluate_deepeval_context_relevancy(preds, llm, topK=10) -> dict:
     cr_metric = ContextualRelevancyMetric(model=llm)
     evaluate_deepeval(deepeval_testcases, [cr_metric])
 
-if __name__ == "__main__":
-    pred_labels = [0, 1, 1, 0, 0, 1, 1, 0]
-    ref_labels_correct = [0, 1, 1, 0, 0, 1, 1, 0]
-    ref_labels_wrong = [0, 1, 1, 0, 0, 0, 1, 1]
+def get_auprc(truth, pred_prob):
+    """
+    Evaluate the AUPRC.
+    - pred: list of predictions of probability, e.g. [0.1, 0.9, 0.2, ...]
+    - truth: list of truth, e.g. [0, 1, 0, ...]
+    """
+    if len(truth) == 0 or len(set(truth)) == 1:
+        return np.nan
+    precision, recall, _ = precision_recall_curve(truth, pred_prob, pos_label=1)
+    auprc = auc(recall, precision)
+    return auprc
+
+def get_r_precision(pred_prob, truth):
+    '''
+    Evaluate the R-Precision.
+    - pred: list of predicted probability, e.g. [0.1, 0.9, 0.2, ...]
+    - truth: list of truth, e.g. [0, 1, 0, ...]
+    '''
+    R = sum(truth)
+    topR_pred_prob = sorted(pred_prob, reverse=True)[:R]
+    r_precision = sum([1 for p in topR_pred_prob if p > 0.5]) / R if R > 0 else 0
+    return r_precision
