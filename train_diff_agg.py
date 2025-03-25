@@ -81,7 +81,6 @@ def compute_metrics(p):
     disorder = []
     for l, p in tqdm(zip(true_labels, true_predictions_bin)):
         disorder.append(get_observed_disorder(l, p))
-    print('num of nan disorder:', np.sum(np.isnan(disorder)))
         
 
     
@@ -103,6 +102,7 @@ def compute_metrics(p):
         "auprc": np.nanmean(auprc),
         "disorder": np.nanmean(disorder),
         "r_precision": np.nanmean(r_precision),
+        "num_nan_disorder": np.sum(np.isnan(disorder)),
     }
 
 
