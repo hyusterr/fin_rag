@@ -304,7 +304,7 @@ if __name__ == "__main__":
         from transformers import BertForTokenClassification
         base_model = BertForTokenClassification.from_pretrained(
             args.model_name,
-            num_labels=args.num_labels,
+            num_labels=len(ID2LABEL),
             id2label=ID2LABEL,
             label2id=LABEL2ID,
         )
