@@ -9,15 +9,19 @@ import torch
 import torch.nn.functional as F
 from datasets import Dataset, DatasetDict
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
+from scipy.special import softmax
 from tqdm import tqdm
 from transformers import (
     AutoTokenizer,
+    AutoModelForTokenClassification,
     TrainingArguments,
     Trainer,
     EarlyStoppingCallback,
     pipeline,
+    AutoConfig,
 )
 import evaluate
+import argparse
 
 # Import your custom modules (adjust the import paths as needed)
 from data_utils import (
@@ -39,6 +43,19 @@ from highlighter.agg_highlighter import AggHighlighter
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
+
+import torch.nn as nn
+
+class BertForTokenClassificationWrapper(nn.Module):
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+
+    def forward(self, *args, **kwargs):
+        # 移除不屬於原始模型 forward 的額外參數
+        for key in ['epoch', 'aggregation', 'num_items_in_batch']:
+            kwargs.pop(key, None)
+        return self.model.forward(*args, **kwargs)
 
 
 def compute_metrics(p):
@@ -101,19 +118,17 @@ def set_global_seed(seed: int):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-def AggTrainer(Trainer):
-    '''
+class AggTrainer(Trainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-    '''
 
-    def compute_loss(self, model, inputs, return_outputs=False):
+    def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
         """
         Compute the loss for the model.
         """
         current_epoch = self.state.epoch if self.state is not None else 0
         inputs["epoch"] = current_epoch
-        return super().compute_loss(model, inputs, return_outputs=return_outputs)
+        return super().compute_loss(model, inputs, return_outputs=return_outputs, **kwargs)
 
 
 def train_highlighter(
@@ -252,36 +267,92 @@ def train_highlighter(
 # ===== Example usage =====
 if __name__ == "__main__":
     # Load your default model and tokenizer (or plug in any alternative)
-    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-    from transformers import AutoModelForTokenClassification
-    model = AutoModelForTokenClassification.from_pretrained(
-        "bert-base-uncased",
-        num_labels=2,
-        id2label=ID2LABEL,
-        label2id=LABEL2ID,
-    )
+    args = argparse.ArgumentParser()
+    args.add_argument('--output_dir', '-o', type=str, default='checkpoints/highlighter')
+    args.add_argument('--run_name', '-r', type=str, default='highlighter_training')
+    args.add_argument('--learning_rate', '-lr', type=float, default=2e-5)
+    args.add_argument('--num_train_epochs', '-n', type=int, default=50)
+    args.add_argument('--early_stopping_patience', '-p', type=int, default=5)
+    args.add_argument('--train_batch_size', '-b', type=int, default=16)
+    args.add_argument('--eval_batch_size', '-e', type=int, default=16)
+    args.add_argument('--weight_decay', '-w', type=float, default=0.01)
+    args.add_argument('--eval_strategy', '-es', type=str, default='epoch')
+    args.add_argument('--save_strategy', '-ss', type=str, default='epoch')
+    args.add_argument('--report_to', '-rt', type=str, default='wandb')
+    args.add_argument('--model_name', '-m', type=str, default='bert-base-uncased')
+    args.add_argument('--train_model', '-tm', type=bool, default=True)
+    args.add_argument('--seed', '-s', type=int, default=42)
+    args.add_argument('--train_agg_types', '-t', nargs='+', default=["naive"])
+    args.add_argument('--validate_agg_type', '-v', type=str, default='naive')
+    args.add_argument('--metric_for_best_model', '-mbm', type=str, default='valid_f1')
+    args.add_argument('--greater_is_better', '-gib', type=bool, default=True)
+    args.add_argument('--agg_strategy', '-as', type=str, default='mix')
+    args.add_argument('--agg_type_order', '-ato', type=list, default=["strict", "loose"])
+    args.add_argument('--agg_type_weights', '-atw', default=[0.5, 0.5])
 
-    # Optionally, you can prepare an inference module (e.g., an attn_highlighter instance)
-    inference_module = None  # Replace with your module instance if needed
 
-    # Call the training function.
-    # Set train_model=False to run in inference-only mode.
+    args = args.parse_args()
+
+    
+    import os
+    os.environ["WANDB_PROJECT"]="fin.highlight"
+    import wandb
+    wandb.login()
+
+
+    if args.model_name == 'bert-base-uncased':
+        from transformers import BertForTokenClassification
+        base_model = BertForTokenClassification.from_pretrained(
+            args.model_name,
+            num_labels=args.num_labels,
+            id2label=ID2LABEL,
+            label2id=LABEL2ID,
+        )
+        model = BertForTokenClassificationWrapper(base_model)
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    if args.model_name == 'agg_highlighter':
+        config = AutoConfig.from_pretrained('bert-base-uncased')
+        model = AggHighlighter(
+            config,
+            agg_weights_base=args.agg_type_weights,
+            type_order=args.agg_type_order,
+            strategy=args.agg_strategy,
+            id2label=ID2LABEL,
+            label2id=LABEL2ID,
+            num_labels=len(ID2LABEL),
+        )
+        tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+
+
     trainer_obj = train_highlighter(
         model=model,
         tokenizer=tokenizer,
-        train_agg_types=["strict"],
-        metric_for_best_model="f1",
-        greater_is_better=True,
+        train_agg_types=args.train_agg_types,
+        validate_agg_type=args.validate_agg_type,
+        metric_for_best_model=args.metric_for_best_model,
+        greater_is_better=args.greater_is_better,
         training_args_kwargs={
-            "output_dir": "checkpoints/highlighter_strict",
-            "run_name": "highlighter_strict",
-            "learning_rate": 2e-5,
-            "num_train_epochs": 30,
-            "early_stopping_patience": 5,
+            "output_dir": args.output_dir,
+            "run_name": args.run_name,
+            "learning_rate": args.learning_rate,
+            "num_train_epochs": args.num_train_epochs,
+            "early_stopping_patience": args.early_stopping_patience,
+            "train_batch_size": args.train_batch_size,
+            "eval_batch_size": args.eval_batch_size,
+            "weight_decay": args.weight_decay,
+            "eval_strategy": args.eval_strategy,
+            "save_strategy": args.save_strategy,
+            "report_to": args.report_to,
         },
-        train_model=True,  # Change to False for inference-only mode
-        inference_module=inference_module,
+        train_model=args.train_model,
+        seed=args.seed,
     )
+
+
+
+    # Optionally, you can prepare an inference module (e.g., an attn_highlighter instance)
+    inference_module = None  # Replace with your module instance if needed
 
     # If training, trainer_obj is the Trainer instance.
     print("Training complete.")

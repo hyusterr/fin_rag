@@ -5,6 +5,8 @@ from pathlib import Path
 from pprint import pprint
 from typing import List
 from collections import Counter
+import torch
+import torch.nn.functional as F
 from transformers import DataCollatorForTokenClassification
 from transformers.data.data_collator import DataCollatorMixin, pad_without_fast_tokenizer_warning
 
@@ -145,9 +147,10 @@ class AggDataCollatorForTokenClassification(DataCollatorForTokenClassification):
             pad_to_multiple_of=self.pad_to_multiple_of,
             return_tensors="pt",
         )
-        # agg_labels = [feature["aggregation"] for feature in features]
-        # agg_labels = F.one_hot(torch.tensor(agg_labels), num_classes=len(agg_map))
-        # batch["aggregation"] = agg_labels # torch.tensor(agg_labels)
+        
+        agg_labels = [feature["aggregation"] for feature in features]
+        agg_labels = F.one_hot(torch.tensor(agg_labels), num_classes=len(AGG_MAP)).float()
+        batch["aggregation"] = agg_labels # torch.tensor(agg_labels)
         if labels is None:
             return batch
         
