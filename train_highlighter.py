@@ -309,7 +309,7 @@ if __name__ == "__main__":
             label2id=LABEL2ID,
         )
         model = BertForTokenClassificationWrapper(base_model)
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
     if args.model_name == 'agg_highlighter':
         config = AutoConfig.from_pretrained('bert-base-uncased')
