@@ -287,7 +287,7 @@ if __name__ == "__main__":
     args.add_argument('--metric_for_best_model', '-mbm', type=str, default='valid_f1')
     args.add_argument('--greater_is_better', '-gib', type=bool, default=True)
     args.add_argument('--agg_strategy', '-as', type=str, default='mix')
-    args.add_argument('--agg_type_order', '-ato', type=list, default=["strict", "loose"])
+    args.add_argument('--agg_type_order', '-ato', nargs='+', default=['strict', 'loose'])
     args.add_argument('--agg_type_weights', '-atw', default=[0.5, 0.5])
 
 
