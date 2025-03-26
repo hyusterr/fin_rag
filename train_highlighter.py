@@ -35,6 +35,7 @@ from evaluation.metrics import (
     get_r_precision,
     get_correlation,
 )
+from highlighter.agg_highlighter import AggHighlighter
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
@@ -67,7 +68,7 @@ def compute_metrics(p):
     disorder = []
     for l, p in tqdm(zip(true_labels, true_predictions_bin), total=len(true_labels), desc="Computing disorder"):
         disorder.append(get_observed_disorder(l, p))
-    print('Number of NaN disorder:', np.sum(np.isnan(disorder)))
+    # print('Number of NaN disorder:', np.sum(np.isnan(disorder)))
 
     # Compute standard metrics
     f1 = [f1_score(l, p, pos_label=1, average='binary') for l, p in zip(true_labels, true_predictions_bin)]
@@ -86,6 +87,7 @@ def compute_metrics(p):
         "auprc": np.nanmean(auprc),
         "disorder": np.nanmean(disorder),
         "r_precision": np.nanmean(r_precision),
+        "num_nan_disorder": np.sum(np.isnan(disorder)),
     }
 
 
@@ -99,13 +101,28 @@ def set_global_seed(seed: int):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
+def AggTrainer(Trainer):
+    '''
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    '''
+
+    def compute_loss(self, model, inputs, return_outputs=False):
+        """
+        Compute the loss for the model.
+        """
+        current_epoch = self.state.epoch if self.state is not None else 0
+        inputs["epoch"] = current_epoch
+        return super().compute_loss(model, inputs, return_outputs=return_outputs)
+
 
 def train_highlighter(
     model,
     tokenizer,
     train_agg_types: List[str] = ["naive"],
-    compute_metrics_fn=default_compute_metrics,
-    metric_for_best_model: str = "f1",  # e.g., "valid_f1", "disorder", etc.
+    validate_agg_type: str = "naive",
+    compute_metrics_fn=compute_metrics,
+    metric_for_best_model: str = "valid_f1",  # e.g., "valid_f1", "disorder", etc.
     greater_is_better: bool = True,
     training_args_kwargs: Optional[dict] = None,
     train_model: bool = True,
@@ -140,24 +157,24 @@ def train_highlighter(
 
     # Prepare aggregation labels, e.g., "naive_aggregation", "loose_aggregation", etc.
     agg_labels = [f"{agg}_aggregation" for agg in train_agg_types]
+    validate_agg_type = f"{validate_agg_type}_aggregation"
     train_dataset = Dataset.from_generator(
         data_generator_mix_all,
         gen_kwargs={'data_list': train_data, 'aggregation_labels': agg_labels},
     )
     valid_dataset = Dataset.from_generator(
         data_generator_mix_all,
-        gen_kwargs={'data_list': valid_data, 'aggregation_labels': [agg_labels[0]]},
+        gen_kwargs={'data_list': valid_data, 'aggregation_labels': [validate_agg_type]},
     )
     test_dataset = Dataset.from_generator(
         data_generator_mix_all,
-        gen_kwargs={'data_list': test_data, 'aggregation_labels': [agg_labels[0]]},
+        gen_kwargs={'data_list': test_data, 'aggregation_labels': [validate_agg_type]},
     )
     datasets = {"train": train_dataset, "valid": valid_dataset, "test": test_dataset}
-    if expert_data is not None:
-        expert_dataset = Dataset.from_generator(
-            data_generator_expert, gen_kwargs={'data_list': expert_data}
-        )
-        datasets["expert"] = expert_dataset
+    expert_dataset = Dataset.from_generator(
+        data_generator_expert, gen_kwargs={'data_list': expert_data}
+    )
+    datasets["expert"] = expert_dataset
     dataset_dict = DatasetDict(datasets)
 
     # Tokenize and align labels
@@ -191,6 +208,7 @@ def train_highlighter(
     )
 
     # Inference-only mode: skip training and run inference on sample texts.
+    '''
     if not train_model:
         sample_texts = ["This is a sample input text for highlighting inference."]
         if inference_module is not None:
@@ -202,9 +220,10 @@ def train_highlighter(
             # Fallback: use a token-classification pipeline.
             pipe = pipeline("token-classification", model=model, tokenizer=tokenizer)
             return pipe(sample_texts)
+    '''
 
     # Initialize the Trainer
-    trainer = Trainer(
+    trainer = AggTrainer(
         model=model,
         args=training_args,
         train_dataset=tokenized_datasets["train"],
@@ -212,7 +231,7 @@ def train_highlighter(
             "train": tokenized_datasets["train"],
             "valid": tokenized_datasets["valid"],
             "test": tokenized_datasets["test"],
-            **({"expert": tokenized_datasets["expert"]} if "expert" in tokenized_datasets else {}),
+            "expert": tokenized_datasets["expert"]
         },
         data_collator=data_collator,
         compute_metrics=compute_metrics_fn,
@@ -224,7 +243,8 @@ def train_highlighter(
     )
 
     # Train and then evaluate the model
-    trainer.train(ignore_keys_for_eval=["attentions", "hidden_states"])
+    if train_model:
+        trainer.train(ignore_keys_for_eval=["attentions", "hidden_states"])
     trainer.evaluate(trainer.train_dataset, ignore_keys=["attentions", "hidden_states"])
     return trainer
 
@@ -249,12 +269,12 @@ if __name__ == "__main__":
     trainer_obj = train_highlighter(
         model=model,
         tokenizer=tokenizer,
-        train_agg_types=["naive", "loose"],
+        train_agg_types=["strict"],
         metric_for_best_model="f1",
         greater_is_better=True,
         training_args_kwargs={
-            "output_dir": "checkpoints/highlighter_example",
-            "run_name": "highlighter_run",
+            "output_dir": "checkpoints/highlighter_strict",
+            "run_name": "highlighter_strict",
             "learning_rate": 2e-5,
             "num_train_epochs": 30,
             "early_stopping_patience": 5,
