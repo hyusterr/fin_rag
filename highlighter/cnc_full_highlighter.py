@@ -6,8 +6,9 @@ import numpy as np
 from typing import Optional, List
 from pathlib import Path
 from transformers import (
-    AutoTokenizer, BertModel, BertPreTrainedModel, TokenClassifierOutput
+    AutoTokenizer, BertModel, BertPreTrainedModel
 )
+from transformers.modeling_outputs import TokenClassifierOutput
 from utils.utils import read_jsonl
 from utils.config import FORMMATED_DIR
 

@@ -24,11 +24,13 @@ import evaluate
 import argparse
 
 # Import your custom modules (adjust the import paths as needed)
+from utils.utils import retrieve_paragraph_from_docid
 from data_utils import (
     data_generator_mix_all,
     data_generator_expert,
     tokenize_and_align_labels,
     AggDataCollatorForTokenClassification,
+    # CncDataCollatorForTokenClassification,
     read_setting2_data,
     ID2LABEL,
     LABEL2ID,
@@ -40,6 +42,8 @@ from evaluation.metrics import (
     get_correlation,
 )
 from highlighter.agg_highlighter import AggHighlighter
+from highlighter.cnc_full_highlighter import BertForHighlightPrediction, CncAlignment
+from transformers.modeling_outputs import TokenClassifierOutput
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
@@ -50,12 +54,64 @@ class BertForTokenClassificationWrapper(nn.Module):
     def __init__(self, model):
         super().__init__()
         self.model = model
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def forward(self, *args, **kwargs):
         # 移除不屬於原始模型 forward 的額外參數
-        for key in ['epoch', 'aggregation', 'num_items_in_batch']:
+        for key in ['epoch', 'aggregation', 'num_items_in_batch', 'id']:
             kwargs.pop(key, None)
         return self.model.forward(*args, **kwargs)
+
+class CncHighlighterWrapper(nn.Module):
+    def __init__(self, model_name='DylanJHJ/bert-base-final-v0-ep2'):
+        super().__init__()
+        self.highlighter = BertForHighlightPrediction.from_pretrained(model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.cnc_alignment = CncAlignment()
+
+    # question: is trainer.evaluate() calling this function? or call .predict()?
+    def forward(self, *args, **kwargs):
+        # inputs: dict with 'text' key
+        references = []
+        for i in range(len(kwargs['id'])):
+            target = dict()
+            target['id'] = kwargs['id'][i]
+            target['text'] = kwargs['text'][i]
+            cnc_alignment_results = self.cnc_alignment.align(target)
+            references.append(cnc_alignment_results)
+
+        references = [retrieve_paragraph_from_docid(r[0]) for r in references]
+
+        # print(references)
+        
+        highlight_results = self.highlighter.encode(
+            text_tgt=kwargs['text'],
+            text_ref=references,
+            pretokenized=False,
+        )
+        max_len = max([len(p['word_probs_tgt']) for p in highlight_results])
+        for p in highlight_results:
+            p['word_probs_tgt'] = p['word_probs_tgt'] + [0] * (max_len - len(p['word_probs_tgt']))
+        logits = torch.tensor([p['word_probs_tgt'] for p in highlight_results])
+        return TokenClassificationOutput(logits=logits)
+
+
+
+
+def run_cnc_alignment_on_dataset(output_trec=None):
+    # 假設我們用 test_data 來做 CNC alignment
+    retrieve_results = {}
+    train_data, valid_data, test_data, expert_data = read_setting2_data()
+    names = ['train', 'valid', 'test']
+    cnc_alignment = CncAlignment()
+    for name, data in zip(names, [train_data, valid_data, test_data]):
+        # [train_data, valid_data, test_data]: # id of expert data is the same as the test data
+        results = cnc_alignment.align_all(data)
+        retrieve_results[name] = results
+        if name == 'test':
+            retrieve_results['expert'] = results
+        
+    return retrieve_results
 
 
 def compute_metrics(p):
@@ -141,6 +197,7 @@ def train_highlighter(
     greater_is_better: bool = True,
     training_args_kwargs: Optional[dict] = None,
     train_model: bool = True,
+    resume_from_checkpoint: Optional[str] = None,
     seed: int = 42,
     data_collator: Optional = None,
     inference_module: Optional[object] = None,
@@ -175,22 +232,27 @@ def train_highlighter(
     validate_agg_type = f"{validate_agg_type}_aggregation"
     train_dataset = Dataset.from_generator(
         data_generator_mix_all,
+        cache_dir='./data_cache',
         gen_kwargs={'data_list': train_data, 'aggregation_labels': agg_labels},
     )
     valid_dataset = Dataset.from_generator(
         data_generator_mix_all,
+        cache_dir='./data_cache',
         gen_kwargs={'data_list': valid_data, 'aggregation_labels': [validate_agg_type]},
     )
     test_dataset = Dataset.from_generator(
         data_generator_mix_all,
+        cache_dir='./data_cache',
         gen_kwargs={'data_list': test_data, 'aggregation_labels': [validate_agg_type]},
     )
     datasets = {"train": train_dataset, "valid": valid_dataset, "test": test_dataset}
     expert_dataset = Dataset.from_generator(
-        data_generator_expert, gen_kwargs={'data_list': expert_data}
+        data_generator_expert, gen_kwargs={'data_list': expert_data},
+        cache_dir='./data_cache',
     )
     datasets["expert"] = expert_dataset
     dataset_dict = DatasetDict(datasets)
+    print(train_dataset[0])
 
     # Tokenize and align labels
     def tokenize_and_align_labels_wrapper(examples):
@@ -259,8 +321,8 @@ def train_highlighter(
 
     # Train and then evaluate the model
     if train_model:
-        trainer.train(ignore_keys_for_eval=["attentions", "hidden_states"])
-    trainer.evaluate(trainer.train_dataset, ignore_keys=["attentions", "hidden_states"])
+        trainer.train(ignore_keys_for_eval=["attentions", "hidden_states"], resume_from_checkpoint=resume_from_checkpoint)
+    trainer.evaluate(ignore_keys=["attentions", "hidden_states"])
     return trainer
 
 
@@ -289,6 +351,7 @@ if __name__ == "__main__":
     args.add_argument('--agg_strategy', '-as', type=str, default='mix')
     args.add_argument('--agg_type_order', '-ato', nargs='+', default=['strict', 'loose'])
     args.add_argument('--agg_type_weights', '-atw', default=[0.5, 0.5])
+    args.add_argument('--resume_from_checkpoint', '-rfc', type=bool, default=False)
 
 
     args = args.parse_args()
@@ -299,8 +362,16 @@ if __name__ == "__main__":
     import wandb
     wandb.login()
 
+    if args.resume_from_checkpoint:
+        # Load the model from the checkpoint
+        if model_name == 'agg_highlighter':
+            model = AggHighlighter.from_pretrained(args.output_dir)
+        else:
+            model = AutoModelForTokenClassification.from_pretrained(args.output_dir)
+        tokenizer = AutoTokenizer.from_pretrained(args.output_dir)
+        data_collator = None
 
-    if args.model_name == 'bert-base-uncased':
+    elif args.model_name == 'bert-base-uncased':
         from transformers import BertForTokenClassification
         base_model = BertForTokenClassification.from_pretrained(
             args.model_name,
@@ -310,8 +381,9 @@ if __name__ == "__main__":
         )
         model = BertForTokenClassificationWrapper(base_model)
         tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        data_collator = None
 
-    if args.model_name == 'agg_highlighter':
+    elif args.model_name == 'agg_highlighter':
         config = AutoConfig.from_pretrained('bert-base-uncased')
         model = AggHighlighter(
             config,
@@ -323,6 +395,13 @@ if __name__ == "__main__":
             num_labels=len(ID2LABEL),
         )
         tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+        data_collator = None
+
+
+    elif args.model_name == 'cnc_highlighter':
+        model = CncHighlighterWrapper()
+        tokenizer = model.tokenizer
+        data_collator = CncDataCollatorForTokenClassification(tokenizer=tokenizer)
 
 
     trainer_obj = train_highlighter(
@@ -344,8 +423,10 @@ if __name__ == "__main__":
             "eval_strategy": args.eval_strategy,
             "save_strategy": args.save_strategy,
             "report_to": args.report_to,
+            "resume_from_checkpoint": args.resume_from_checkpoint,
         },
         train_model=args.train_model,
+        data_collator=data_collator,
         seed=args.seed,
     )
 

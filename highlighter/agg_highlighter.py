@@ -20,7 +20,7 @@ class AggHighlighter(BertForTokenClassification):
             strategy: 選擇 'mix'、'cirriculum' 或 'sequential'
             type_order: 指定所使用的 aggregation type 序列，例如 ['strict', 'naive', 'loose']
         """
-        assert strategy in ['mix', 'cirriculum', 'sequential'], "strategy 必須在 ['mix', 'cirriculum', 'sequential'] 中"
+        assert strategy in ['mix', 'curriculum', 'sequential'], "strategy 必須在 ['mix', 'cirriculum', 'sequential'] 中"
         assert type_order is not None and len(type_order) > 0, "請傳入至少一種 aggregation type 到 type_order"
         for ty in type_order:
             assert ty in AGG_MAP.keys(), f"{ty} 不在 AGG_MAP 定義中"
@@ -121,7 +121,7 @@ class AggHighlighter(BertForTokenClassification):
                     else:
                         loss = token_loss.mean()
 
-                elif self.strategy == 'cirriculum':
+                elif self.strategy == 'curriculum':
                     
                     agg_weights = [0.] * len(AGG_MAP)
                     if epoch is None:
