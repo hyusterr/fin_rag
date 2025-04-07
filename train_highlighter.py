@@ -68,11 +68,16 @@ class CncHighlighterWrapper(nn.Module):
     def __init__(self, model_name='DylanJHJ/bert-base-final-v0-ep2'):
         super().__init__()
         self.highlighter = BertForHighlightPrediction.from_pretrained(model_name)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.cnc_alignment = CncAlignment()
+        # self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        # self.cnc_alignment = CncAlignment()
 
     # question: is trainer.evaluate() calling this function? or call .predict()?
     def forward(self, *args, **kwargs):
+        for key in ['epoch', 'aggregation', 'num_items_in_batch', 'id']:
+            kwargs.pop(key, None)
+        return self.highlighter(*args, **kwargs)
+
+        '''
         # inputs: dict with 'text' key
         references = []
         for i in range(len(kwargs['id'])):
@@ -96,6 +101,7 @@ class CncHighlighterWrapper(nn.Module):
             p['word_probs_tgt'] = p['word_probs_tgt'] + [0] * (max_len - len(p['word_probs_tgt']))
         logits = torch.tensor([p['word_probs_tgt'] for p in highlight_results])
         return TokenClassificationOutput(logits=logits)
+        '''
 
 
 
@@ -332,6 +338,16 @@ def train_highlighter(
 
 # ===== Example usage =====
 if __name__ == "__main__":
+    def str2bool(v):
+        if isinstance(v, bool):
+            return v
+        if v.lower() in ('yes', 'true', 't', 'y', '1'):
+            return True
+        elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+            return False
+        else:
+            raise argparse.ArgumentTypeError('Boolean value expected.')
+
     # Load your default model and tokenizer (or plug in any alternative)
     args = argparse.ArgumentParser()
     args.add_argument('--output_dir', '-o', type=str, default='checkpoints/highlighter')
@@ -346,16 +362,16 @@ if __name__ == "__main__":
     args.add_argument('--save_strategy', '-ss', type=str, default='epoch')
     args.add_argument('--report_to', '-rt', type=str, default='wandb')
     args.add_argument('--model_name', '-m', type=str, default='bert-base-uncased')
-    args.add_argument('--train_model', '-tm', type=bool, default=True)
+    args.add_argument('--train_model', '-tm', type=str2bool, default=True)
     args.add_argument('--seed', '-s', type=int, default=42)
     args.add_argument('--train_agg_types', '-t', nargs='+', default=["naive"])
     args.add_argument('--validate_agg_type', '-v', type=str, default='naive')
     args.add_argument('--metric_for_best_model', '-mbm', type=str, default='valid_f1')
-    args.add_argument('--greater_is_better', '-gib', type=bool, default=True)
+    args.add_argument('--greater_is_better', '-gib', type=str2bool, default=True)
     args.add_argument('--agg_strategy', '-as', type=str, default='mix')
     args.add_argument('--agg_type_order', '-ato', nargs='+', default=['strict', 'loose'])
     args.add_argument('--agg_type_weights', '-atw', default=[0.5, 0.5])
-    args.add_argument('--resume_from_checkpoint', '-rfc', type=bool, default=False)
+    args.add_argument('--resume_from_checkpoint', '-rfc', type=str2bool, default=False)
 
 
     args = args.parse_args()
@@ -411,11 +427,15 @@ if __name__ == "__main__":
 
 
     elif args.model_name == 'cnc_highlighter':
-        model = BertForHighlightPrediction.from_pretrained('DylanJHJ/bert-base-final-v0-ep2')
+        # model = BertForHighlightPrediction.from_pretrained('DylanJHJ/bert-base-final-v0-ep2')
+        model = CncHighlighterWrapper('DylanJHJ/bert-base-final-v0-ep2')
         tokenizer = AutoTokenizer.from_pretrained('DylanJHJ/bert-base-final-v0-ep2')
         # data_collator = CncDataCollatorForTokenClassification(tokenizer=tokenizer)
         data_collator = None
         tokenize_and_align_fn = tokenize_and_align_labels_cnc
+
+    print("Training or not training:", args.train_model)
+    print("Model name:", args.model_name)
 
 
     trainer_obj = train_highlighter(
