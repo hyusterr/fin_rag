@@ -19,6 +19,7 @@ from transformers import (
     EarlyStoppingCallback,
     pipeline,
     AutoConfig,
+    BertForTokenClassification,
 )
 import evaluate
 import argparse
@@ -29,6 +30,7 @@ from data_utils import (
     data_generator_mix_all,
     data_generator_expert,
     tokenize_and_align_labels,
+    tokenize_and_align_labels_cnc,
     AggDataCollatorForTokenClassification,
     # CncDataCollatorForTokenClassification,
     read_setting2_data,
@@ -196,6 +198,7 @@ def train_highlighter(
     metric_for_best_model: str = "valid_f1",  # e.g., "valid_f1", "disorder", etc.
     greater_is_better: bool = True,
     training_args_kwargs: Optional[dict] = None,
+    tokenize_and_align_labels_fn=tokenize_and_align_labels,
     train_model: bool = True,
     resume_from_checkpoint: Optional[str] = None,
     seed: int = 42,
@@ -256,7 +259,7 @@ def train_highlighter(
 
     # Tokenize and align labels
     def tokenize_and_align_labels_wrapper(examples):
-        return tokenize_and_align_labels(examples, tokenizer=tokenizer)
+        return tokenize_and_align_labels_fn(examples, tokenizer=tokenizer)
 
     tokenized_datasets = dataset_dict.map(tokenize_and_align_labels_wrapper, batched=True)
 
@@ -323,6 +326,7 @@ def train_highlighter(
     if train_model:
         trainer.train(ignore_keys_for_eval=["attentions", "hidden_states"], resume_from_checkpoint=resume_from_checkpoint)
     trainer.evaluate(ignore_keys=["attentions", "hidden_states"])
+    trainer.save_model(training_args_kwargs.get("output_dir", "checkpoints/highlighter"))
     return trainer
 
 
@@ -364,11 +368,17 @@ if __name__ == "__main__":
 
     if args.resume_from_checkpoint:
         # Load the model from the checkpoint
-        if model_name == 'agg_highlighter':
+        if args.model_name == 'agg_highlighter':
             model = AggHighlighter.from_pretrained(args.output_dir)
         else:
-            model = AutoModelForTokenClassification.from_pretrained(args.output_dir)
+            try:
+                model = AutoModelForTokenClassification.from_pretrained(args.output_dir)
+            except Exception as e:
+                base_model = BertForTokenClassification.from_pretrained(args.output_dir)
+                model = BertForTokenClassificationWrapper(base_model) 
+
         tokenizer = AutoTokenizer.from_pretrained(args.output_dir)
+        tokenize_and_align_fn = tokenize_and_align_labels
         data_collator = None
 
     elif args.model_name == 'bert-base-uncased':
@@ -382,6 +392,7 @@ if __name__ == "__main__":
         model = BertForTokenClassificationWrapper(base_model)
         tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         data_collator = None
+        tokenize_and_align_fn = tokenize_and_align_labels
 
     elif args.model_name == 'agg_highlighter':
         config = AutoConfig.from_pretrained('bert-base-uncased')
@@ -396,12 +407,15 @@ if __name__ == "__main__":
         )
         tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
         data_collator = None
+        tokenize_and_align_fn = tokenize_and_align_labels
 
 
     elif args.model_name == 'cnc_highlighter':
-        model = CncHighlighterWrapper()
-        tokenizer = model.tokenizer
-        data_collator = CncDataCollatorForTokenClassification(tokenizer=tokenizer)
+        model = BertForHighlightPrediction.from_pretrained('DylanJHJ/bert-base-final-v0-ep2')
+        tokenizer = AutoTokenizer.from_pretrained('DylanJHJ/bert-base-final-v0-ep2')
+        # data_collator = CncDataCollatorForTokenClassification(tokenizer=tokenizer)
+        data_collator = None
+        tokenize_and_align_fn = tokenize_and_align_labels_cnc
 
 
     trainer_obj = train_highlighter(
@@ -411,6 +425,7 @@ if __name__ == "__main__":
         validate_agg_type=args.validate_agg_type,
         metric_for_best_model=args.metric_for_best_model,
         greater_is_better=args.greater_is_better,
+        tokenize_and_align_labels_fn=tokenize_and_align_fn,
         training_args_kwargs={
             "output_dir": args.output_dir,
             "run_name": args.run_name,
@@ -436,5 +451,5 @@ if __name__ == "__main__":
     inference_module = None  # Replace with your module instance if needed
 
     # If training, trainer_obj is the Trainer instance.
-    print("Training complete.")
+    print("Trainer running complete.")
 

@@ -12,6 +12,7 @@ from transformers.modeling_outputs import TokenClassifierOutput
 from utils.utils import read_jsonl
 from utils.config import FORMMATED_DIR
 
+import time
 
 class CncAlignment:
     def __init__(self, topK=10, rouge_type='rouge2', tag="cnc_alignment"):
@@ -21,8 +22,11 @@ class CncAlignment:
         self.tag = tag
 
     def align(self, target):
+        # this is ~0.1 sec per target
+        # print(target)
+        start_time = time.time()
         target_id = target["id"]
-        target_text = target["text"]
+        target_text = target["texts"]
         date, form, cik, part, item, para = target_id.split("_")
         year = int(date[:4])
         search_pattern_file = f"{year-1}*_{form}_{cik}.jsonl"
@@ -55,6 +59,8 @@ class CncAlignment:
         else:
             result = ranked_paragraphs[:argmax_diff+1]
 
+        # print('Time taken for alignment:', time.time() - start_time)
+
         return result
 
     def align_all(self, targets):
@@ -62,6 +68,37 @@ class CncAlignment:
         for target in targets:
             results[target["id"]] = self.align(target)
         return results
+
+    def align_a_batch(self, targets):
+        '''
+        targets: dict of lists, e.g.
+        {
+            "id": ["2023-01-01_10-K_12345_1_1_1", "2023-01-01_10-K_12345_1_2_1"],
+            "texts": ["text1", "text2"]
+        }
+        returns:
+        list of lists, e.g.
+        [
+            [("2023-01-01_10-K_12345_1_1_1", 0.9), ("2023-01-01_10-K_12345_1_2_1", 0.8)],
+            [("2023-01-01_10-K_12345_1_2_1", 0.85), ("2023-01-01_10-K_12345_1_1_1", 0.75)]
+        ]
+        '''
+        time_start = time.time()
+        batch_size = len(targets["id"])
+        print("Batch size:", batch_size)
+        results_of_batch = []
+        for i in range(batch_size):
+            target = {
+                "id": targets["id"][i],
+                "texts": targets["texts"][i]
+            }
+            results = self.align(target)
+            results_of_batch.append(results)
+        print("Time taken for batch alignment:", time.time() - time_start)
+
+        return results_of_batch
+
+
 
     def output_trec(self, results, output_file):
         with open(output_file, "w") as f:

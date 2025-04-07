@@ -9,8 +9,10 @@ import torch
 import torch.nn.functional as F
 from transformers import DataCollatorForTokenClassification
 from transformers.data.data_collator import DataCollatorMixin, pad_without_fast_tokenizer_warning
+from transformers import BertTokenizerFast
 
-from utils.utils import read_jsonl
+from highlighter.cnc_full_highlighter import CncAlignment
+from utils.utils import read_jsonl, retrieve_paragraph_from_docid
 DATA_DIR = Path('annotation/annotated_result/all/setting2/')
 TRAIN_DATA = DATA_DIR / 'train.jsonl'
 VALID_DATA = DATA_DIR / 'valid.jsonl'
@@ -73,12 +75,15 @@ def data_generator_mix_all(data_list, aggregation_labels=['strict_aggregation', 
     
     for data in data_list:
         tokens = data['tokens']
+        id_ = data['sample_id']
+        text = data['text']
         for key in data:
             if 'aggregation' in key:
                 if key not in aggregation_labels:
                     continue
                 labels = data[key]['label']
-                yield {'tokens': tokens, 'labels': labels, 'aggregation': key.split('_')[0]}
+                yield {'id': id_, 'tokens': tokens, 'labels': labels, 'aggregation': key.split('_')[0], 'texts': text}
+
 
 def data_generator_expert(data_list):
     for data in data_list:
@@ -87,6 +92,72 @@ def data_generator_expert(data_list):
         texts = data[id_]['text']
         labels = data[id_]['binary_labels']
         yield {'id': id_, 'tokens': tokens, 'texts': texts, 'labels': labels, 'aggregation': 'expert'}
+
+
+def tokenize_and_align_labels_cnc(examples, tokenizer, topK=1):
+    '''
+    examples is dictionary of list(len=batch_size)
+    e.g. 'aggregation': ['expert', 'expert', 'expert', ...]
+    '''
+    cnc_alignment = CncAlignment(topK=topK)
+    
+    references = cnc_alignment.align_a_batch(examples) # list of (doc_id, rouge_score) # this assume only one input target, but in fact, there are multiple targets in examples # align is for one sample
+    if topK > 1:
+        raise NotImplementedError('topK > 1 is not implemented yet')
+    else:
+        # NOTE: for now, only use the first one
+        references = [r[0] for r in references]
+    references_texts = [retrieve_paragraph_from_docid(doc_id) for doc_id, _ in references]
+    references_words = [r.split() for r in references_texts]
+    target_words = examples['tokens']
+    references_size = len(references_words)
+    assert references_size == len(target_words), f"references size {references_size} != target size {len(target_words)}"
+    tokenized_inputs = tokenizer(
+        references_words, target_words,
+        is_split_into_words=True,
+        truncation=True,
+        max_length=512, # for BERT
+        # padding=True if tokenizer.padding_side == 'right' else False,
+    )
+    # print(tokenized_inputs.keys())
+    # print(tokenizer.decode(tokenized_inputs['input_ids'][0]))
+    # NOTE: implement for top1 for now
+    # NOTE: not sure if padding is needed here
+    labels = [] # labels for this batch
+    for i, label in enumerate(examples['labels']):
+        word_ids = tokenized_inputs.word_ids(batch_index=i)
+        segment_ids = tokenized_inputs['token_type_ids'][i]
+        # print(word_ids)
+        # print(segment_ids)
+        previous_word_idx = None
+        label_ids = [] # labels for this sample
+        for word_idx, seg_idx in zip(word_ids, segment_ids):
+            if seg_idx == 0: # for the ref sentence
+                label_ids.append(-100)
+            elif seg_idx == 1: # for the target sentence
+                if word_idx is None:
+                    label_ids.append(-100)
+                elif label[word_idx] is None:
+                    label_ids.append(-100)
+
+                elif word_idx != previous_word_idx:
+                    label_ids.append(label[word_idx])
+                else:
+                    label_ids.append(-100)
+                previous_word_idx = word_idx
+
+        labels.append(label_ids)
+
+    tokenized_inputs["labels"] = labels
+    # operate dictionary in this stage instead of in gpu
+    tokenized_inputs['aggregation'] = [AGG_MAP[agg] if agg in AGG_MAP else 0 for agg in examples['aggregation']]
+
+    return tokenized_inputs
+
+
+
+
+
 
 def tokenize_and_align_labels(examples, tokenizer):
     # parallel pre-process in cpu
@@ -329,7 +400,49 @@ def read_slice_data(data_dir: str):
 
 
 if __name__ == '__main__':
-    data_path = 'annotation/annotated_result/all/aggregate_qlabels.jsonl'
-    statistics = get_statistics(data_path)
-    pprint(statistics)
+    import argparse
+    from datasets import DatasetDict, Dataset
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--train_agg_type', '-t', nargs='+', default=['loose', 'strict'])
+    parser.add_argument('--validation_agg_type', '-v', type=str, default='naive')
+    train_data, valid_data, test_data, expert_data = read_setting2_data()
+    args = parser.parse_args()
 
+    train_agg_types = args.train_agg_type
+    validate_agg_type = args.validation_agg_type
+
+    agg_labels = [f"{agg}_aggregation" for agg in train_agg_types]
+    validate_agg_type = f"{validate_agg_type}_aggregation"
+    train_dataset = Dataset.from_generator(
+        data_generator_mix_all,
+        cache_dir='./data_cache',
+        gen_kwargs={'data_list': train_data, 'aggregation_labels': agg_labels},
+    )
+    valid_dataset = Dataset.from_generator(
+        data_generator_mix_all,
+        cache_dir='./data_cache',
+        gen_kwargs={'data_list': valid_data, 'aggregation_labels': [validate_agg_type]},
+    )
+    test_dataset = Dataset.from_generator(
+        data_generator_mix_all,
+        cache_dir='./data_cache',
+        gen_kwargs={'data_list': test_data, 'aggregation_labels': [validate_agg_type]},
+    )
+    datasets = {"train": train_dataset, "valid": valid_dataset, "test": test_dataset}
+    expert_dataset = Dataset.from_generator(
+        data_generator_expert, gen_kwargs={'data_list': expert_data},
+        cache_dir='./data_cache',
+    )
+    datasets["expert"] = expert_dataset
+    dataset_dict = DatasetDict(datasets)
+
+    tokenizer = BertTokenizerFast.from_pretrained('bert-base-uncased')
+
+    def tokenize_and_align_labels_wrapper(examples):
+        return tokenize_and_align_labels_cnc(examples, tokenizer=tokenizer)
+
+    tokenized_datasets = dataset_dict.map(tokenize_and_align_labels_wrapper, batched=True)
+
+    
+    # tokenize_and_align_labels_cnc(train_dataset[0], tokenizer)
+    # tokenize_and_align_labels(train_dataset[0], tokenizer)
