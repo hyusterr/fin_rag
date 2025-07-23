@@ -7,7 +7,7 @@ from sklearn.metrics import roc_auc_score, precision_recall_curve, auc, f1_score
 # from deepeval.test_case import LLMTestCase
 # from deepeval import evaluate as evaluate_deepeval
 import pulp
-from utils.utils import retrieve_paragraph_from_docid
+from ..utils.utils import retrieve_paragraph_from_docid
 from itertools import product
 from scipy.special import softmax
 from tqdm import tqdm

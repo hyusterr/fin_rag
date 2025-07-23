@@ -1,11 +1,11 @@
 # from highlighter.base import BERTHighlighter
-from utils.utils import read_jsonl
+from .utils.utils import read_jsonl
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from transformers import DataCollatorForTokenClassification, TrainingArguments, Trainer, EarlyStoppingCallback
 from transformers.data.data_collator import DataCollatorMixin, pad_without_fast_tokenizer_warning
-from highlighter.agg_highlighter import AggHighlighter
+from .highlighter.agg_highlighter import AggHighlighter
 from datasets import Dataset, load_dataset, DatasetDict
 import evaluate
 from pathlib import Path
@@ -23,13 +23,13 @@ from sklearn.metrics import (
     recall_score,
     accuracy_score
 )
-from evaluation.metrics import (
+from .evaluation.metrics import (
     get_observed_disorder, 
     get_auprc, 
     get_r_precision, 
     get_correlation
 )
-from data_utils import (
+from .data_utils import (
     data_generator_mix_all, 
     data_generator_expert, 
     tokenize_and_align_labels,

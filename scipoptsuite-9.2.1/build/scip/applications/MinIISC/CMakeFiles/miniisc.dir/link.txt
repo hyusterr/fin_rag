@@ -1,0 +1,1 @@
+/usr/bin/cc -O3 -DNDEBUG CMakeFiles/miniisc.dir/src/benders.c.o CMakeFiles/miniisc.dir/src/miniisc.c.o CMakeFiles/miniisc.dir/src/readargs.c.o -o ../../../bin/applications/miniisc  -Wl,-rpath,/tmp2/yshuang/fin.rag/scipoptsuite-9.2.1/build/lib ../../../lib/libscip.so.9.2.1.0 -lm 

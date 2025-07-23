@@ -6,7 +6,7 @@ from transformers.modeling_outputs import TokenClassifierOutput
 
 # 假設 AGG_MAP 為一個 dict，例如：
 # AGG_MAP = {'strict': 0, 'harsh': 1, 'complex': 2, 'naive': 3, 'loose': 4}
-from data_utils import AGG_MAP
+from ..data_utils import AGG_MAP
 
 def get_curriculum_weight(epoch: int, decay_rate: float = 0.1) -> float:
     return math.exp(-decay_rate * epoch)

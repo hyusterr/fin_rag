@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from collections import defaultdict
 from pathlib import Path
-from utils.utils import retrieve_paragraph_from_docid, read_jsonl, read_json
+from ..utils.utils import retrieve_paragraph_from_docid, read_jsonl, read_json
 from .metrics import evaluate_a_pair_highlight, evaluate_spans_in_a_pair_highlight
 from pprint import pprint
 from tqdm.auto import tqdm

@@ -1,0 +1,1 @@
+-DAUTOBUILD=on -DPAPILO_DIR=/tmp2/yshuang/fin.rag/scipoptsuite-9.2.1/build -DZIMPL=off -DSANITIZE_UNDEFINED=on -DSOPLEX_DIR=/tmp2/yshuang/fin.rag/scipoptsuite-9.2.1/build -DSYM=snauty

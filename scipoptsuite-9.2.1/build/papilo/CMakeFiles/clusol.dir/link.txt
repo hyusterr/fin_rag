@@ -1,0 +1,2 @@
+/usr/bin/ar qc libclusol.a CMakeFiles/clusol.dir/src/papilo/external/lusol/src/lusol6b.f.o CMakeFiles/clusol.dir/src/papilo/external/lusol/src/lusol7b.f.o CMakeFiles/clusol.dir/src/papilo/external/lusol/src/lusol8b.f.o CMakeFiles/clusol.dir/src/papilo/external/lusol/src/lusol_util.f.o CMakeFiles/clusol.dir/src/papilo/external/lusol/src/lusol.f90.o CMakeFiles/clusol.dir/src/papilo/external/lusol/src/clusol.c.o CMakeFiles/clusol.dir/src/papilo/external/lusol/src/lusol_precision.f90.o
+/usr/bin/ranlib libclusol.a

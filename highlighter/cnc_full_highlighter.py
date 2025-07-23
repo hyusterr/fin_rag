@@ -9,8 +9,8 @@ from transformers import (
     AutoTokenizer, BertModel, BertPreTrainedModel
 )
 from transformers.modeling_outputs import TokenClassifierOutput
-from utils.utils import read_jsonl
-from utils.config import FORMMATED_DIR
+from ..utils.utils import read_jsonl
+from ..utils.config import FORMMATED_DIR
 
 import time
 

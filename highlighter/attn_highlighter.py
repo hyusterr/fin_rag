@@ -7,7 +7,7 @@ from torch.nn import CrossEntropyLoss
 import numpy as np
 import transformers
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline, AutoModelForSeq2SeqLM
-from highlighter.base import BaseHighlighter
+from ..highlighter.base import BaseHighlighter
 from typing import List
 
 # because FPB's label is defined by "the impact of the news on the stock price", we can use the sentiment analysis model to predict the label

@@ -11,8 +11,8 @@ from transformers import DataCollatorForTokenClassification
 from transformers.data.data_collator import DataCollatorMixin, pad_without_fast_tokenizer_warning
 from transformers import BertTokenizerFast
 
-from highlighter.cnc_full_highlighter import CncAlignment
-from utils.utils import read_jsonl, retrieve_paragraph_from_docid
+from .highlighter.cnc_full_highlighter import CncAlignment
+from .utils.utils import read_jsonl, retrieve_paragraph_from_docid
 DATA_DIR = Path('annotation/annotated_result/all/setting2/')
 TRAIN_DATA = DATA_DIR / 'train.jsonl'
 VALID_DATA = DATA_DIR / 'valid.jsonl'
