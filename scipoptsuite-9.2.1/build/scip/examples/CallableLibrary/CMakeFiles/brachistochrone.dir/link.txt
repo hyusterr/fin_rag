@@ -1,1 +1,0 @@
-/usr/bin/cc -O3 -DNDEBUG CMakeFiles/brachistochrone.dir/src/brachistochrone.c.o -o ../../../bin/examples/brachistochrone  -Wl,-rpath,/tmp2/yshuang/fin.rag/scipoptsuite-9.2.1/build/lib ../../../lib/libscip.so.9.2.1.0 -lm 

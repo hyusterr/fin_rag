@@ -1,1 +1,0 @@
-/usr/bin/cc -O3 -DNDEBUG CMakeFiles/relaxator.dir/src/cmain.c.o CMakeFiles/relaxator.dir/src/relax_lp.c.o CMakeFiles/relaxator.dir/src/relax_nlp.c.o -o ../../../bin/examples/relaxator  -Wl,-rpath,/tmp2/yshuang/fin.rag/scipoptsuite-9.2.1/build/lib ../../../lib/libscip.so.9.2.1.0 

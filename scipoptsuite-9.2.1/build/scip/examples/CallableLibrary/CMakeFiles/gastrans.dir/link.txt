@@ -1,1 +1,0 @@
-/usr/bin/cc -O3 -DNDEBUG CMakeFiles/gastrans.dir/src/gastrans.c.o -o ../../../bin/examples/gastrans  -Wl,-rpath,/tmp2/yshuang/fin.rag/scipoptsuite-9.2.1/build/lib ../../../lib/libscip.so.9.2.1.0 -lm 

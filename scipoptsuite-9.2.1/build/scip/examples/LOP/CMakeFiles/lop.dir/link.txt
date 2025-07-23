@@ -1,1 +1,0 @@
-/usr/bin/cc -O3 -DNDEBUG CMakeFiles/lop.dir/src/cmain.c.o CMakeFiles/lop.dir/src/cons_lop.c.o CMakeFiles/lop.dir/src/reader_lop.c.o -o ../../../bin/examples/lop  -Wl,-rpath,/tmp2/yshuang/fin.rag/scipoptsuite-9.2.1/build/lib ../../../lib/libscip.so.9.2.1.0 
